@@ -10,14 +10,14 @@ function Install-VmFeatures {
         [Parameter(Mandatory = $true)]
         [string] $AdminName,
         [Parameter(Mandatory = $true)]
-        [securestring] $AdminPassword,
+        [securestring] $AdminPass,
         [Parameter(Mandatory = $true)]
         [string] $DomainName,
         [Parameter(Mandatory = $true)]
         [string] $DomainBiosName
     )
     
-    [pscredential] $Credential = New-Object System.Management.Automation.PSCredential($AdminName, $AdminPassword)
+    [pscredential] $Credential = New-Object System.Management.Automation.PSCredential($AdminName, $AdminPass)
     
     try {
         Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi' -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
@@ -35,7 +35,7 @@ function Install-VmFeatures {
         Write-Error $_.Exception.Message
     }
 
-    if ($vmrole -eq 'domain' || $vmrole -eq 'domaincontroller' || $vmrole -eq 'dc') {
+    if ($vmrole -ieq 'domain' -or $vmrole -ieq 'domaincontroller' -or $vmrole -ieq 'dc') {
         try {
             Install-WindowsFeature -Name AD-Domain-Services, DNS -Credential $Credential -IncludeAllSubFeature -IncludeManagementTools
             Import-Module ADDSDeployment 
