@@ -1,7 +1,3 @@
-# Define the event source and log name
-$eventSource = "CustomScriptEvent"
-$logName = "Application"
-
 function Install-VmFeatures {
     [CmdletBinding()]
     param(
@@ -10,33 +6,26 @@ function Install-VmFeatures {
         [Parameter(Mandatory = $true)]
         [string] $AdminName,
         [Parameter(Mandatory = $true)]
-        [securestring] $AdminPass,
+        [securestring] $AdminPassword,
         [Parameter(Mandatory = $true)]
         [string] $DomainName,
         [Parameter(Mandatory = $true)]
         [string] $DomainBiosName
     )
     
-    [pscredential] $Credential = New-Object System.Management.Automation.PSCredential($AdminName, $AdminPass)
+    [pscredential] $Credential = New-Object System.Management.Automation.PSCredential($AdminName, $AdminPassword)
     
     try {
+        # Install PowerShell 7.3.2 and enable PSRemoting
         Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi' -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
         msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
-        Set-NetFirewallRule -DisplayGroup "Windows Remote Management" -Enabled True
-        Enable-PSRemoting -SkipNetworkProfileCheck -Force
+
+        # Enable basic authentication and allow unencrypted traffic in WSMan
         Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
         Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true
-    }
-    catch {
-        # If an error occurs, log it to the Windows event log
-        $eventLog = New-Object System.Diagnostics.EventLog($logName)
-        $eventLog.Source = $eventSource
-        $eventLog.WriteEntry($_.Exception.Message, [System.Diagnostics.EventLogEntryType]::Error)   
-        Write-Error $_.Exception.Message
-    }
 
-    if ($vmrole -ieq 'domain' -or $vmrole -ieq 'domaincontroller' -or $vmrole -ieq 'dc') {
-        try {
+        if ($vmrole -eq 'domain' -or $vmrole -eq 'domaincontroller' -or $vmrole -eq 'dc') {
+            # Install Active Directory Domain Services and promote to a domain controller
             Install-WindowsFeature -Name AD-Domain-Services, DNS -Credential $Credential -IncludeAllSubFeature -IncludeManagementTools
             Import-Module ADDSDeployment 
             Install-ADDSForest -DomainName $DomainName -DomainNetbiosName $DomainBiosName `
@@ -47,25 +36,16 @@ function Install-VmFeatures {
                 -NoRebootOnCompletion `
                 -Force
         }
-        catch {
-            # If an error occurs, log it to the Windows event log
-            $eventLog = New-Object System.Diagnostics.EventLog($logName)
-            $eventLog.Source = $eventSource
-            $eventLog.WriteEntry($_.Exception.Message, [System.Diagnostics.EventLogEntryType]::Error)
-            Write-Error $_.Exception.Message
-        }
-    }
-    else {
-        try {
+        else {
+            # Install failover clustering and file server features
             Install-WindowsFeature -Name Failover-Clustering, FS-FileServer, FS-DFS-Namespace, FS-DFS-Replication, FS-DFS-Service -IncludeManagementTools -Credential $credential
         }
-        catch {
-            # If an error occurs, log it to the Windows event log
-            $eventLog = New-Object System.Diagnostics.EventLog($logName)
-            $eventLog.Source = $eventSource
-            $eventLog.WriteEntry($_.Exception.Message, [System.Diagnostics.EventLogEntryType]::Error)
-            Write-Error $_.Exception.Message
-        }
     }
-    Write-Host "Installation of Windows features completed..."
+    catch {
+        # If an error occurs, log it to the Windows event log and write to the console
+        $eventLog = New-Object System.Diagnostics.EventLog("Application")
+        $eventLog.Source = "CustomScriptEvent"
+        $eventLog.WriteEntry($_.Exception.Message, [System.Diagnostics.EventLogEntryType]::Error)
+        Write-Error $_.Exception.Message
+    }
 }
