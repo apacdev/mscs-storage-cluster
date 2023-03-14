@@ -1,4 +1,5 @@
-function Install-VmFeatures {
+Function Install-VmFeatures 
+{
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -49,3 +50,5 @@ function Install-VmFeatures {
         Write-Error $_.Exception.Message
     }
 }
+
+Export-ModuleMember -Function Install-VmFeatures
