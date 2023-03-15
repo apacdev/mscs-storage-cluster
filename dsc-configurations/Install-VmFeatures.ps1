@@ -3,10 +3,10 @@ param(
     [string] $VmRole,
 
     [Parameter(Mandatory = $true)]
-    [string] $UserName,
+    [string] $AdminName,
         
     [Parameter(Mandatory = $true)]
-    [secureString] $Password,
+    [string] $AdminPass,
         
     [Parameter(Mandatory = $true)]
     [string] $DomainName,
@@ -14,14 +14,14 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $DomainBiosName
 )
-    
-$Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
+$Password = ConvertTo-SecureString -String $AdminPass -AsPlainText -Force    
+$Credential = New-Object System.Management.Automation.PSCredential($AdminName, $Password)
     
 try {
 
     $ps7 = pwsh -Command '$PSVersionTable.PSVersion.Major'
 
-    if (($ps7 -ne 7) -or ($ps7 -le 5) -or ($ps7 -eq $null)) {
+    if (($ps7 -ne 7) -or ($ps7 -le 5) -or ($null -eq $ps7)) {
         Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi' -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
         msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
     }
