@@ -6,7 +6,7 @@ param(
     [string] $UserName,
         
     [Parameter(Mandatory = $true)]
-    [pscredential] $Password,
+    [secureString] $Password,
         
     [Parameter(Mandatory = $true)]
     [string] $DomainName,
@@ -18,7 +18,7 @@ param(
     [string] $DomainServerIpAddress
 )
     
-[pscredential] $Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
+$Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
     
 try {
     # Install PowerShell 7.3.2 and enable PSRemoting
