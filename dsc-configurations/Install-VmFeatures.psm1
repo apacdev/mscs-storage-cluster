@@ -60,7 +60,7 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 
 try {
     if ($VmRole -eq 'domain' -or $VmRole -eq 'domaincontroller' -or $VmRole -eq 'dc') {
-        Install-WindowsFeature -Name AD-Domain-Services-IncludeAllSubFeature -IncludeManagementTools -IncludeAllSubFeature
+        Install-WindowsFeature -Name AD-Domain-Services -IncludeAllSubFeature -IncludeManagementTools
         Import-Module ADDSDeployment 
         Install-ADDSForest -DomainName $DomainName -DomainNetbiosName $DomainBiosName `
             -DomainMode 'WinThreshold' `
