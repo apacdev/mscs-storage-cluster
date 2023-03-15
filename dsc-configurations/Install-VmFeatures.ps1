@@ -29,8 +29,6 @@ Function Write-EventLog {
         [Parameter(Mandatory = $false)]
         [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
-
-    Write-EventLog -LogName $EventLogName -Source $Source -EntryType $EntryType -EventId 1 -Message $Message
 }
 
 $eventSource = "CustomScriptEvent"
