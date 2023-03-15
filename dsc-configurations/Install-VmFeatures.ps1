@@ -24,8 +24,10 @@ Function Write-EventLog {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Message,
+
         [Parameter(Mandatory = $true)]
         [string] $Source,
+        
         [Parameter(Mandatory = $true)]
         [string] $EventLogName
     )
