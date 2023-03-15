@@ -15,6 +15,30 @@ param(
     [string] $DomainBiosName
 )
 
+Function Write-EventLog {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Message,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Source,
+
+        [Parameter(Mandatory = $true)]
+        [string] $EventLogName,
+
+        [Parameter(Mandatory = $false)]
+        [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
+    )
+
+    Write-EventLog -LogName $EventLogName -Source $Source -EntryType $EntryType -EventId 1 -Message $Message
+}
+
+$eventSource = "CustomScriptEvent"
+
+if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
+    [System.Diagnostics.EventLog]::CreateEventSource($eventSource, 'Application')
+}
+
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
 $msi = 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
