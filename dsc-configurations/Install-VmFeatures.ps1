@@ -55,3 +55,7 @@ catch {
     $eventLog.WriteEntry($_.Exception.Message, [System.Diagnostics.EventLogEntryType]::Error)
     Write-Error $_.Exception.Message
 }
+
+$eventLog = New-Object System.Diagnostics.EventLog("Application")
+$eventLog.Source = "CustomScriptEvent"
+$eventLog.WriteEntry('The execution of the Custom Script has completed successfuly.', [System.Diagnostics.EventLogEntryType]::Information)
