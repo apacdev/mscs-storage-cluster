@@ -66,7 +66,8 @@ try {
             -DomainMode 'WinThreshold' `
             -ForestMode 'WinThreshold' `
             -InstallDns `
-            -SafeModeAdministratorPassword $Credential.Password `
+            -Force `
+            -SafeModeAdministratorPassword $Credential.Password
             
         Write-EventLog -Message 'Installation of Active Directory Domain Services completed. Rebooting in 15 seconds' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
         Restart-Computer -Wait 15 -Force
