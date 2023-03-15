@@ -21,10 +21,14 @@ param(
 $Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
     
 try {
-    # Install PowerShell 7.3.2 and enable PSRemoting
-    Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi' -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
-    msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
+    $ps7 = pwsh -Command '$PSVersionTable.PSVersion.Major'
 
+    # Install PowerShell 7.3.2 and enable PSRemoting
+
+    if (($ps7 -ne 7) -or ($ps7 -le 5) -or ($ps7 -eq $null)) {
+        Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi' -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
+        msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
+    }
     # Enable basic authentication and allow unencrypted traffic in WSMan
     Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
     Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true
@@ -44,7 +48,8 @@ try {
     else {
         # Install failover clustering and file server features
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
-        Add-Computer -DomainName $DomainName -Server $DomainServerIpAddress -Credential $Credential -Restart
+        
+        Add-Computer -DomainName $DomainName -Credential $Credential -Restart
     }
 }
 catch {
