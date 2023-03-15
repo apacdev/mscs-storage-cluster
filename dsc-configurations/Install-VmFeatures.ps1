@@ -45,7 +45,6 @@ try {
     else {
         # Install failover clustering and file server features
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
-        
         Add-Computer -DomainName $DomainName -Credential $Credential -Restart
     }
 }
