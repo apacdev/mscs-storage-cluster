@@ -67,7 +67,7 @@ try {
             -ForestMode 'WinThreshold' `
             -InstallDns `
             -SafeModeAdministratorPassword $Credential.Password `
-            -Restart ` 
+            -Restart
             
         Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
     }
