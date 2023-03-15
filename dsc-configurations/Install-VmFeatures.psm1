@@ -74,10 +74,10 @@ try {
         Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
     }
     else {
-        Start-Sleep -Seconds 300
-        Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature | Add-Computer -DomainName $DomainName -Credential $Credential -Restart
-        Write-EventLog -Message 'Windows Feature Installation has completed' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
+        Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
         Restart-Computer -Force
+        Add-Computer -DomainName $DomainName -Credential $Credential -Restart
+        Write-EventLog -Message 'Windows Feature Installation has completed' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
     }
 }
 catch {
