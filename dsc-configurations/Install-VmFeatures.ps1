@@ -18,9 +18,8 @@ param(
 $Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
     
 try {
-    $ps7 = pwsh -Command '$PSVersionTable.PSVersion.Major'
 
-    # Install PowerShell 7.3.2 and enable PSRemoting
+    $ps7 = pwsh -Command '$PSVersionTable.PSVersion.Major'
 
     if (($ps7 -ne 7) -or ($ps7 -le 5) -or ($ps7 -eq $null)) {
         Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi' -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
@@ -41,11 +40,17 @@ try {
             -DomainAdministratorCredential $Credential `
             -SafeModeAdministratorPassword $Credential.Password `
             -Force
+            $eventLog = New-Object System.Diagnostics.EventLog("Application")
+            $eventLog.Source = "CustomScriptEvent"
+            $eventLog.WriteEntry('The execution of the Custom Script (Domain Controller) has been completed successfuly.', [System.Diagnostics.EventLogEntryType]::Information)
     }
     else {
         # Install failover clustering and file server features
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
         Add-Computer -DomainName $DomainName -Credential $Credential -Restart
+        $eventLog = New-Object System.Diagnostics.EventLog("Application")
+        $eventLog.Source = "CustomScriptEvent"
+        $eventLog.WriteEntry('The execution of the Custom Script (Cluster Node) has been completed successfuly.', [System.Diagnostics.EventLogEntryType]::Information)
     }
 }
 catch {
@@ -55,7 +60,3 @@ catch {
     $eventLog.WriteEntry($_.Exception.Message, [System.Diagnostics.EventLogEntryType]::Error)
     Write-Error $_.Exception.Message
 }
-
-$eventLog = New-Object System.Diagnostics.EventLog("Application")
-$eventLog.Source = "CustomScriptEvent"
-$eventLog.WriteEntry('The execution of the Custom Script has completed successfuly.', [System.Diagnostics.EventLogEntryType]::Information)
