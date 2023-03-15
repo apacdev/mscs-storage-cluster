@@ -43,7 +43,7 @@ try {
     }
     else {
         # Install failover clustering and file server features
-        Install-WindowsFeature -Name Failover-Clustering, FS-FileServer, FS-DFS-Namespace, FS-DFS-Replication, FS-DFS-Service -IncludeManagementTools -Credential $Credential
+        Install-WindowsFeature -Name Failover-Clustering, FS-FileServer, FS-DFS-Namespace, FS-DFS-Replication, FS-DFS-Service -IncludeManagementTools
         Add-Computer -DomainName $DomainName -Server $DomainServerIpAddress -Credential $Credential -Restart
     }
 }
