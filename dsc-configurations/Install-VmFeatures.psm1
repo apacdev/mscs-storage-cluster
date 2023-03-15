@@ -62,7 +62,7 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 
 try {
     if ($VmRole -eq 'domain' -or $VmRole -eq 'domaincontroller' -or $VmRole -eq 'dc') {
-        Install-WindowsFeature -Name AD-Domain-Services, DNS -Credential $Credential -IncludeAllSubFeature -IncludeManagementTools
+        Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
         Import-Module ADDSDeployment 
         Install-ADDSForest -DomainName $DomainName -DomainNetbiosName $DomainBiosName `
             -DomainMode 'WinThreshold' `
@@ -74,9 +74,9 @@ try {
         Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
     }
     else {
+        Start-Sleep -Seconds 300
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature | Add-Computer -DomainName $DomainName -Credential $Credential -Restart
         Write-EventLog -Message 'Windows Feature Installation has completed' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
-        Start-Sleep -Seconds 60
         Restart-Computer -Force
     }
 }
