@@ -75,7 +75,6 @@ try {
     }
     else {
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
-        Restart-Computer -Force
         Add-Computer -DomainName $DomainName -Credential $Credential -Restart
         Write-EventLog -Message 'Windows Feature Installation has completed' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
     }
