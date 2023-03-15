@@ -16,6 +16,7 @@ param(
 )
 
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
+$url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
 
 # write function to log to Windows Event Log
 Function Write-EventLog {
@@ -35,10 +36,10 @@ Function Write-EventLog {
 }
 
 try {
-    
+
     if ($PSVersionTable.PSVersion.Major -lt 7) {    
+        # Install PowerShell 7 
         Write-EventLog -Message 'PowerShell 7 is not installed, starting with download and installation' -Source 'CustomScriptEvent' -EventLogName 'Application'
-        $url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
         Invoke-WebRequest -Uri $url -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
         msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
         Write-EventLog -Message 'Installation of PowerShell 7 is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application'
