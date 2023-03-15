@@ -29,8 +29,6 @@ Function Write-EventLog {
         [Parameter(Mandatory = $false)]
         [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
-
-    Write-EventLog -LogName $EventLogName -Source $Source -EntryType $EntryType -EventId 1 -Message $Message
 }
 
 $eventSource = "CustomScriptEvent"
@@ -62,15 +60,15 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 
 try {
     if ($VmRole -eq 'domain' -or $VmRole -eq 'domaincontroller' -or $VmRole -eq 'dc') {
-        Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
+        Install-WindowsFeature -Name AD-Domain-Services-IncludeAllSubFeature -IncludeManagementTools -IncludeAllSubFeature
         Import-Module ADDSDeployment 
         Install-ADDSForest -DomainName $DomainName -DomainNetbiosName $DomainBiosName `
             -DomainMode 'WinThreshold' `
             -ForestMode 'WinThreshold' `
             -InstallDns `
-            -DomainAdministratorCredential $Credential `
             -SafeModeAdministratorPassword $Credential.Password `
-            -Restart -Force
+            -Restart ` 
+            
         Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
     }
     else {
