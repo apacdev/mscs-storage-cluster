@@ -69,7 +69,7 @@ try {
             -SafeModeAdministratorPassword $Credential.Password `
             
         Write-EventLog -Message 'Installation of Active Directory Domain Services completed. Rebooting in 15 seconds' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
-        Restart-Computer -Wait 15
+        Restart-Computer -Wait 15 -Force
     }
     else {
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
