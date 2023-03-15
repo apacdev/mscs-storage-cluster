@@ -67,9 +67,9 @@ try {
             -ForestMode 'WinThreshold' `
             -InstallDns `
             -SafeModeAdministratorPassword $Credential.Password `
-            -Restart
             
-        Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
+        Write-EventLog -Message 'Installation of Active Directory Domain Services completed. Rebooting in 15 seconds' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
+        Restart-Computer -Wait 15
     }
     else {
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
