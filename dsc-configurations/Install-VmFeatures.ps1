@@ -14,20 +14,39 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $DomainBiosName
 )
-$Password = ConvertTo-SecureString -String $AdminPass -AsPlainText -Force    
-$Credential = New-Object System.Management.Automation.PSCredential($AdminName, $Password)
-    
+
+$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
+
+# write function to log to Windows Event Log
+Function Write-EventLog {
+
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Message,
+        [Parameter(Mandatory = $true)]
+        [string] $Source,
+        [Parameter(Mandatory = $true)]
+        [string] $EventLogName
+    )
+
+    $eventLog = New-Object System.Diagnostics.EventLog($EventLogName)
+    $eventLog.Source = $Source
+    $eventLog.WriteEntry($Message, [System.Diagnostics.EventLogEntryType]::Information)
+}
+
 try {
-
-    $ps7 = pwsh -Command '$PSVersionTable.PSVersion.Major'
-
-    if (($ps7 -ne 7) -or ($ps7 -le 5) -or ($null -eq $ps7)) {
-        Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi' -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
+    
+    if ($PSVersionTable.PSVersion.Major -lt 7) {    
+        Write-EventLog -Message 'PowerShell 7 is not installed, starting with download and installation' -Source 'CustomScriptEvent' -EventLogName 'Application'
+        $url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
+        Invoke-WebRequest -Uri $url -OutFile 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
         msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
+        Write-EventLog -Message 'Installation of PowerShell 7 is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application'
+        # Enable basic authentication and allow unencrypted traffic in WSMan
+        Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
+        Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true
+        Write-EventLog -Message 'The execution of the Custom Script (WSMan Authentication) has been started.' -Source 'CustomScriptEvent' -EventLogName 'Application'
     }
-    # Enable basic authentication and allow unencrypted traffic in WSMan
-    Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
-    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true
 
     if ($VmRole -eq 'domain' -or $VmRole -eq 'domaincontroller' -or $VmRole -eq 'dc') {
         # Install Active Directory Domain Services and promote to a domain controller
