@@ -82,3 +82,10 @@ catch {
     $eventLog.WriteEntry($_.Exception.Message, [System.Diagnostics.EventLogEntryType]::Error)
     Write-Error $_.Exception.Message
 }
+
+# Wait for 60 seconds then Restart the computer. Mure the script resumes after the restart
+Start-Sleep -Seconds 60
+Restart-Computer -Force
+
+# Write to the Windows Event Log
+Write-EventLog -Message 'The VM has been rebooted successfuly.' -Source 'CustomScriptEvent' -EventLogName 'Application'
