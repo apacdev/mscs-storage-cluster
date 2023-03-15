@@ -24,19 +24,21 @@ try {
 
     if ($VmRole -eq 'domain' -or $VmRole -eq 'domaincontroller' -or $VmRole -eq 'dc') {
         # Install Active Directory Domain Services and promote to a domain controller
-        Install-WindowsFeature -Name AD-Domain-Services, DNS -Credential $Credential -IncludeAllSubFeature -IncludeManagementTools
+        Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
         Import-Module ADDSDeployment 
         Install-ADDSForest -DomainName $DomainName -DomainNetbiosName $DomainBiosName `
             -DomainMode 'WinThreshold' `
             -ForestMode 'WinThreshold' `
             -InstallDns `
+            -DomainAdministratorCredential $Credential `
             -SafeModeAdministratorPassword $Credential.Password `
             -NoRebootOnCompletion `
             -Force
     }
     else {
         # Install failover clustering and file server features
-        Install-WindowsFeature -Name Failover-Clustering, FS-FileServer, FS-DFS-Namespace, FS-DFS-Replication, FS-DFS-Service -IncludeManagementTools -Credential $Credential
+        Install-WindowsFeature -Name Failover-Clustering, FS-FileServer, FS-DFS-Namespace, FS-DFS-Replication, FS-DFS-Service -IncludeManagementTools
+        Add-Computer -DomainName $DomainName -Credential $Credential -Restart
     }
 }
 catch {
