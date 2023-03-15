@@ -12,7 +12,10 @@ param(
     [string] $DomainName,
         
     [Parameter(Mandatory = $true)]
-    [string] $DomainBiosName
+    [string] $DomainBiosName,
+
+    [Parameter(Mandatory = $true)]
+    [string] $DomainServerIpAddress
 )
     
 [pscredential] $Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
@@ -41,7 +44,7 @@ try {
     else {
         # Install failover clustering and file server features
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer, FS-DFS-Namespace, FS-DFS-Replication, FS-DFS-Service -IncludeManagementTools -Credential $Credential
-        Add-Computer -DomainName $DomainName -Server '172.16.0.100' -Credential $Credential -Restart
+        Add-Computer -DomainName $DomainName -Server $DomainServerIpAddress -Credential $Credential -Restart
     }
 }
 catch {
