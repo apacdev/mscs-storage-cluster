@@ -12,10 +12,7 @@ param(
     [string] $DomainName,
         
     [Parameter(Mandatory = $true)]
-    [string] $DomainBiosName,
-
-    [Parameter(Mandatory = $true)]
-    [string] $DomainServerIpAddress
+    [string] $DomainBiosName
 )
     
 $Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
