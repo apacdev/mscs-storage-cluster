@@ -124,7 +124,7 @@ try {
         }
         Add-Computer -DomainName $DomainName -Credential $Credential
         Write-EventLog -Message 'Windows Feature Installation has completed' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
-        Restart-Computer -Wait 120 -Force
+        Restart-Computer -Force
     }
 }
 catch {
