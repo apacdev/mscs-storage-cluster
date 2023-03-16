@@ -155,7 +155,6 @@ try {
             return
         }
 
-
         Write-EventLog -Message 'Windows Feature Installation and domain join started.' -Source $EventSource -EventLogName $EventLogName -EntryType Information
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
         # Configure Windows Firewall to allow SMB, NFS, and SQL Server
