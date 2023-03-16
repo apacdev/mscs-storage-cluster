@@ -79,6 +79,7 @@ if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
 $msi = 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
+$dns = 'c:\windows\system32\drivers\etc\hosts'
 
 if ($PSVersionTable.PSVersion.Major -lt 7) {    
     
@@ -118,8 +119,8 @@ try {
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
         Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "$DomainServerIp $DomainName"
         # Check if the entry already exists in the hosts file
-        if ($null -eq (Select-String -Path $HostsFilePath -Pattern "^$IPAddress\s+$DomainName")) {
-            Add-Content -Path $HostsFilePath -Value "$IPAddress $DomainName"
+        if ($null -eq (Select-String -Path $dns -Pattern "^$IPAddress\s+$DomainName")) {
+            Add-Content -Path $dns -Value "$IPAddress $DomainName"
             Write-EventLog -Message 'Private IP of Domain Controller added to the Hosts file.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
         }
         Add-Computer -DomainName $DomainName -Credential $Credential
