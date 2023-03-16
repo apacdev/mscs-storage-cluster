@@ -95,8 +95,10 @@ if (-not $pwshPath) {
     if (-not (Test-Path -Path $msi)) {
         try {
             Invoke-WebRequest -Uri $url -OutFile $msi -ErrorAction Stop
-            Write-Host "PowerShell 7.3.2 downloaded successfully to: $msi"
+            Write-EventLog -Message 'PowerShell 7.3.2 downloaded successfully.' -Source $EventSource -EventLogName $EventLogName
             msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
+            write-EventLog -Message 'Installation of PowerShell 7 is completed.' -Source $EventSource -EventLogName $EventLogName
+            Install-PackageProvider -Name NuGet -Force
             Install-Module -Name Az -AllowClobber -Force
             Write-EventLog -Message 'Installation of Az module is completed.' -Source $EventSource -EventLogName $EventLogName
      
@@ -146,7 +148,7 @@ try {
     }
     else {
         # Give it some time and wait for the domain controller to be ready
-        Start-Sleep -Seconds 180 
+        Start-Sleep -Seconds 600 
         # Check if the domain server IP address is valid
         if (-not (Test-Connection -ComputerName $DomainServerIp -Count 1 -Quiet)) {
             Write-EventLog -Message "Invalid domain server IP address specified: $DomainServerIp" -Source $EventSource -EventLogName $EventLogName -EntryType Error
