@@ -20,6 +20,9 @@ Specifies the name of the domain.
 .PARAMETER DomainBiosName
 Specifies the NetBIOS name of the domain.
 
+.PARAMETER DomainServerIp
+Specifies the Private IP Address of the domain server.
+
 .EXAMPLE
 .\InstallRolesAndFeatures.ps1 -VmRole domain -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainBiosName CONTOSO
 
@@ -46,6 +49,9 @@ param(
         
     [Parameter(Mandatory = $true)]
     [string] $DomainBiosName
+    
+    [Parameter(Mandatory = $true)]
+    [string] $DomainServerIp
 )
 
 Function Write-EventLog {
@@ -94,26 +100,23 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 try {
     if ($VmRole -match '^(ad|domain|domaincontroller|dc)$' -as [bool]) {
         Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
+        Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
+        Start-Sleep -Seconds 30
         # Ensure the ADDSDeployment module is installed and available
-        if (-not (Get-Module -ListAvailable -Name ADDSDeployment)) {
-            Write-Error "The ADDSDeployment module is not available. Please ensure that the Active Directory Domain Services role and its management tools are installed."
-            return
-            Import-Module ADDSDeployment
-            Install-ADDSForest -DomainName $DomainName `
-                -DomainNetbiosName $DomainBiosName `
-                -DomainMode 'WinThreshold' `
-                -ForestMode 'WinThreshold' `
-                -InstallDns `
-                -DomainAdministratorCredential $Credential `
-                -SafeModeAdministratorPassword $Credential.Password `
-                -Restart -Force
-            Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
-        }
+        Import-Module ADDSDeployment
+        Install-ADDSForest -DomainName $DomainName `
+            -DomainNetbiosName $DomainBiosName `
+            -DomainMode 'WinThreshold' `
+            -ForestMode 'WinThreshold' `
+            -InstallDns `
+            -SafeModeAdministratorPassword $Credential.Password `
+            -Force
+        Write-EventLog -Message 'Configuration of Active Directory Domain Services is now completed.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType information
     }
     else {
         Write-EventLog -Message 'Windows Feature Installation (node) started.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
-        Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "172.16.0.100 $DomainName"
+        Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "$DomainServerIp $DomainName"
         # Check if the entry already exists in the hosts file
         if ($null -eq (Select-String -Path $HostsFilePath -Pattern "^$IPAddress\s+$DomainName")) {
             Add-Content -Path $HostsFilePath -Value "$IPAddress $DomainName"
