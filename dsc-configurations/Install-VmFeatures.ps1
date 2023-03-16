@@ -81,38 +81,37 @@ Function Write-EventLog {
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
 $EventLogName = "Application"
-if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $EventLogName)}
+if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $EventLogName) }
 
 $url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
-$msi = 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi'
 $dns = 'c:\windows\system32\drivers\etc\hosts'
+$msi = "$env:USERPROFILE\Desktop\PowerShell-7.3.2-win-x64.msi"
+# Check if PowerShell 7 is installed by searching for 'pwsh' executable in the PATH
+$pwshPath = Get-Command -Name "pwsh" -ErrorAction SilentlyContinue
 
-if ($PSVersionTable.PSVersion.Major -lt 7) {    
-    
+if (-not $pwshPath) {
     Write-EventLog -Message 'Installation of PowerShell 7 started.' -Source $EventSource -EventLogName $EventLogName
     
     if (-not (Test-Path -Path $msi)) {
-        $Request = Invoke-WebRequest -Uri $url -OutFile $msi
-        # Check if the HTTP status code is 200 (OK)
-        if ($Request.StatusCode -ne 200) {
-            Write-EventLog -Message "Failed to download PowerShell 7 MSI file. HTTP status code: $($Request.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Error
-            Write-Error "Failed to download PowerShell 7 MSI file. HTTP status code: $($Request.StatusCode)"
-            return
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $msi -ErrorAction Stop
+            Write-Host "PowerShell 7.3.2 downloaded successfully to: $msi"
+            msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
+            Install-Module -Name Az -AllowClobber -Force
+            Write-EventLog -Message 'Installation of Az module is completed.' -Source $EventSource -EventLogName $EventLogName
+     
+        } catch {
+            Write-EventLog -Message "Error downloading PowerShell 7.3.2: $_" -Source $EventSource -EventLogName $EventLogName
+            Write-Error "Error downloading PowerShell 7.3.2: $_"
         }
-    }
-    else {
-        msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
-        Write-EventLog -Message 'Installation of PowerShell 7 is completed.' -Source $EventSource -EventLogName $EventLogName
-        Install-Module -Name Az -AllowClobber -Force
-        Write-EventLog -Message 'Installation of Az module is completed.' -Source $EventSource -EventLogName $EventLogName
     }
 }
 
 try {
     # Configure Windows Firewall to allow PowerShell Remoting, ICMP, SMB, NFS, and WinRM
-    New-NetFirewallRule -DisplayName 'PowerShell Remoting' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985,5986 -Enabled True
+    New-NetFirewallRule -DisplayName 'PowerShell Remoting' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985, 5986 -Enabled True
     New-NetFirewallRule -DisplayName 'ICMP' -Direction Inbound -Action Allow -Protocol ICMPv4 -Enabled True
-    New-NetFirewallRule -DisplayName 'WinRM' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985,5986 -Enabled True
+    New-NetFirewallRule -DisplayName 'WinRM' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985, 5986 -Enabled True
     Write-EventLog -Message 'Windows Firewall rules for PowerShell Remoting, ICMP, SMB, NFS, and WinRM are now configured.' -Source $EventSource -EventLogName $EventLogName
 
     # Configure WSMan to allow unencrypted traffic
@@ -149,11 +148,11 @@ try {
         # Give it some time and wait for the domain controller to be ready
         Start-Sleep -Seconds 180 
         # Check if the domain server IP address is valid
-        if (-not [bool](try {[System.Net.IPAddress]::Parse($DomainServerIp)} catch { $false })) {
+        if (-not (Test-Connection -ComputerName $DomainServerIp -Count 1 -Quiet)) {
             Write-EventLog -Message "Invalid domain server IP address specified: $DomainServerIp" -Source $EventSource -EventLogName $EventLogName -EntryType Error
-            Write-Error "Invalid domain server IP address specified: $DomainServerIp"
             return
         }
+
 
         Write-EventLog -Message 'Windows Feature Installation and domain join started.' -Source $EventSource -EventLogName $EventLogName -EntryType Information
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
