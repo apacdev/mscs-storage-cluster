@@ -79,7 +79,12 @@ try {
     else {
         Write-EventLog -Message 'Windows Feature Installation (node) started.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
-        Write-EventLog -Message 'Domain join started.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
+        Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "172.16.0.100 $DomainName"
+        # Check if the entry already exists in the hosts file
+        if ($null -eq (Select-String -Path $HostsFilePath -Pattern "^$IPAddress\s+$DomainName")) {
+            Add-Content -Path $HostsFilePath -Value "$IPAddress $DomainName"
+            Write-EventLog -Message 'Private IP of Domain Controller added to the Hosts file.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
+        }
         Add-Computer -DomainName $DomainName -Credential $Credential
         Write-EventLog -Message 'Windows Feature Installation has completed' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
         Restart-Computer -Wait 120 -Force
