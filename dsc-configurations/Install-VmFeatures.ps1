@@ -48,7 +48,7 @@ param(
     [string] $DomainName,
         
     [Parameter(Mandatory = $true)]
-    [string] $DomainBiosName
+    [string] $DomainBiosName,
     
     [Parameter(Mandatory = $true)]
     [string] $DomainServerIp
