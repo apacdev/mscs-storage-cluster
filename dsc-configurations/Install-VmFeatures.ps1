@@ -119,8 +119,9 @@ try {
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
         Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "$DomainServerIp $DomainName"
         # Check if the entry already exists in the hosts file
-        if ($null -eq (Select-String -Path $dns -Pattern "^$IPAddress\s+$DomainName")) {
-            Add-Content -Path $dns -Value "$IPAddress $DomainName"
+        $existingEntry = Get-Content -Path $dns | Where-Object { $_ -match "^$DomainServerIp\s+$DomainName$" } | Select-Object -First 1
+        if (-not $existingEntry) {
+            Add-Content -Path $dns -Value "$DomainServerIp $DomainName"
             Write-EventLog -Message 'Private IP of Domain Controller added to the Hosts file.' -Source 'CustomScriptEvent' -EventLogName 'Application' -EntryType Information
         }
         Add-Computer -DomainName $DomainName -Credential $Credential
