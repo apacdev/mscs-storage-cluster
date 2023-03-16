@@ -1,3 +1,36 @@
+<#
+.SYNOPSIS
+Installs PowerShell 7 and necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. Logs events to the Windows event log and catches any exceptions that occur.
+
+.DESCRIPTION
+This script installs PowerShell 7 on a Windows machine if it's not already installed, and then installs the necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. The script logs events to the Windows event log using a custom event source, and catches and logs any exceptions that occur during the execution of the script.
+
+.PARAMETER VmRole
+Specifies the role of the virtual machine (`domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node).
+
+.PARAMETER AdminName
+Specifies the name of the administrator account for the domain.
+
+.PARAMETER AdminPass
+Specifies the password for the administrator account.
+
+.PARAMETER DomainName
+Specifies the name of the domain.
+
+.PARAMETER DomainBiosName
+Specifies the NetBIOS name of the domain.
+
+.EXAMPLE
+.\InstallRolesAndFeatures.ps1 -VmRole domain -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainBiosName CONTOSO
+
+.NOTES
+- This script requires elevated privileges to run, i.e., as an administrator.
+- The `VmRole` parameter must be one of the following: `domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node.
+- The `AdminName` and `AdminPass` parameters must specify the name and password of an administrator account for the domain.
+- The `DomainName` parameter must specify the name of the domain.
+- The `DomainBiosName` parameter must specify the NetBIOS name of the domain.
+#>
+
 param(
     [Parameter(Mandatory = $true)]
     [string] $VmRole,
@@ -59,14 +92,15 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 }
 
 try {
-    if ($VmRole -eq 'domain' -or $VmRole -eq 'domaincontroller' -or $VmRole -eq 'dc') {
+    if ($VmRole -match '^(ad|domain|domaincontroller|dc)$' -as [bool]) {
         Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
         # Ensure the ADDSDeployment module is installed and available
         if (-not (Get-Module -ListAvailable -Name ADDSDeployment)) {
             Write-Error "The ADDSDeployment module is not available. Please ensure that the Active Directory Domain Services role and its management tools are installed."
             return
             Import-Module ADDSDeployment
-            Install-ADDSForest -DomainName $DomainName -DomainNetbiosName $DomainBiosName `
+            Install-ADDSForest -DomainName $DomainName `
+                -DomainNetbiosName $DomainBiosName `
                 -DomainMode 'WinThreshold' `
                 -ForestMode 'WinThreshold' `
                 -InstallDns `
