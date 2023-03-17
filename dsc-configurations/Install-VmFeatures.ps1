@@ -90,7 +90,7 @@ Function Write-EventLog {
     $log.WriteEntry($Message, $EntryType)
 }
 
-Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o"))." -Source "CustomScriptEvent" -EventLogName "Application"
+Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -Source "CustomScriptEvent" -EventLogName "Application"
 # Check whether the event source exists, and create it if it doesn't exist.
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
@@ -213,4 +213,4 @@ catch {
     Write-EventLog -Message $_.Exception.Message -Source $EventSource -EventLogName $EventLogName -EntryType Error
     Write-Error $_.Exception.Message
 }
-Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o"))." -Source "CustomScriptEvent" -EventLogName "Application"
+Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -Source "CustomScriptEvent" -EventLogName "Application"
