@@ -98,7 +98,23 @@ $EventLogName = "Application"
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $EventLogName) }
 
 $url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
-$msi = "$env:USERPROFILE\Desktop\PowerShell-7.3.2-win-x64.msi"
+$msi = "$env:USERPROFILE\\Desktop\\\PowerShell-7.3.2-win-x64.msi"
+
+# Delayed Start (3 minutes) to make sure all component provisioning is ready.
+Start-Sleep -Seconds 300
+
+# Check if the DNS and URI are working correctly (maybe not necessary with delayed execution of the script)
+try {
+    $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 5
+    if ($response.StatusCode -eq 200) {
+        Write-EventLog -Message "DNS and URI are working correctly. Status code: $($response.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        return
+    } else {
+        Write-EventLog -Message "DNS and URI are not working correctly. Status code: $($response.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Warning
+    }
+} catch {
+    Write-EventLog -Message "Error checking DNS and URI: $_" -Source $EventSource -EventLogName $EventLogName -EntryType Error
+}
 
 # Check if PowerShell 7 is installed by searching for 'pwsh' executable in the PATH
 $pwshPath = Get-Command -Name "pwsh" -ErrorAction SilentlyContinue
@@ -120,6 +136,16 @@ if (-not $pwshPath) {
             Write-EventLog -Message "Error downloading PowerShell 7.3.2: $_" -Source $EventSource -EventLogName $EventLogName
             Write-Error "Error downloading PowerShell 7.3.2: $_"
         }
+    }
+}
+
+Function Set-WindowsFirewallRules {
+    param(
+        [Parameter(Mandatory = $false)]
+        $ports = @{'PowerShell Remoting' = @(5985, 5986); 'ICMP' = 'ICMPv4'}
+    )
+    foreach ($port in $ports.GetEnumerator()) {
+        New-NetFirewallRule -DisplayName $port.Key -Direction Inbound -Action Allow -Protocol TCP -LocalPort $port.Value -Enabled True
     }
 }
 
