@@ -105,7 +105,6 @@ $msi = "$env:USERPROFILE\\Desktop\\\PowerShell-7.3.2-win-x64.msi"
 Start-Sleep -Seconds 60
 
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0
 Set-TimeZone -Id "Singapore Standard Time"
 
 # Check if the DNS and URI are working correctly (maybe not necessary with delayed execution of the script)
