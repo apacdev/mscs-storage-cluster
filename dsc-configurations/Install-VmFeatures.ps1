@@ -6,7 +6,7 @@ Copyright (c) Microsoft Corporation. All rights reserved.
 patrick.shim@live.co.kr (Patrick Shim)
 
 .VERSION
-1.0.0
+1.0.0.1
 
 .SYNOPSIS
 Installs PowerShell 7 and necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. Logs events to the Windows event log and catches any exceptions that occur.
@@ -90,6 +90,7 @@ Function Write-EventLog {
     $log.WriteEntry($Message, $EntryType)
 }
 
+Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o"))." -Source "CustomScriptEvent" -EventLogName "Application"
 # Check whether the event source exists, and create it if it doesn't exist.
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
@@ -97,20 +98,24 @@ $EventLogName = "Application"
 
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $EventLogName) }
 
-$url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
+$url = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi"
 $msi = "$env:USERPROFILE\\Desktop\\\PowerShell-7.3.2-win-x64.msi"
 
-# Delayed Start (3 minutes) to make sure all component provisioning is ready.
-Start-Sleep -Seconds 300
+# Delayed Start (1 minutes) to make sure all component provisioning is ready.
+Start-Sleep -Seconds 60
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0
+Set-TimeZone -Id "Singapore Standard Time"
 
 # Check if the DNS and URI are working correctly (maybe not necessary with delayed execution of the script)
 try {
     $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 5
     if ($response.StatusCode -eq 200) {
         Write-EventLog -Message "DNS and URI are working correctly. Status code: $($response.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Information
-        return
     } else {
         Write-EventLog -Message "DNS and URI are not working correctly. Status code: $($response.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Warning
+        return
     }
 } catch {
     Write-EventLog -Message "Error checking DNS and URI: $_" -Source $EventSource -EventLogName $EventLogName -EntryType Error
@@ -120,13 +125,14 @@ try {
 $pwshPath = Get-Command -Name "pwsh" -ErrorAction SilentlyContinue
 
 if (-not $pwshPath) {
+
     Write-EventLog -Message 'Installation of PowerShell 7 started.' -Source $EventSource -EventLogName $EventLogName
     
     if (-not (Test-Path -Path $msi)) {
         try {
-            Invoke-WebRequest -Uri $url -OutFile $msi -ErrorAction Stop
+            Invoke-WebRequest -Uri $url -OutFile $msi -UseBasicParsing -ErrorAction Stop
             Write-EventLog -Message 'PowerShell 7.3.2 downloaded successfully.' -Source $EventSource -EventLogName $EventLogName
-            msiexec.exe /package 'c:\windows\temp\PowerShell-7.3.2-win-x64.msi' /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
+            msiexec.exe /package $msi /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
             write-EventLog -Message 'Installation of PowerShell 7 is completed.' -Source $EventSource -EventLogName $EventLogName
             Install-PackageProvider -Name NuGet -Force
             Install-Module -Name Az -AllowClobber -Force
@@ -136,16 +142,6 @@ if (-not $pwshPath) {
             Write-EventLog -Message "Error downloading PowerShell 7.3.2: $_" -Source $EventSource -EventLogName $EventLogName
             Write-Error "Error downloading PowerShell 7.3.2: $_"
         }
-    }
-}
-
-Function Set-WindowsFirewallRules {
-    param(
-        [Parameter(Mandatory = $false)]
-        $ports = @{'PowerShell Remoting' = @(5985, 5986); 'ICMP' = 'ICMPv4'}
-    )
-    foreach ($port in $ports.GetEnumerator()) {
-        New-NetFirewallRule -DisplayName $port.Key -Direction Inbound -Action Allow -Protocol TCP -LocalPort $port.Value -Enabled True
     }
 }
 
@@ -162,15 +158,13 @@ try {
 
     $AdRoleExist = Get-WindowsFeature -Name AD-Domain-Services -ErrorAction SilentlyContinue
 
-    if ($VmRole -eq 'domain' -or $VmRole -match '^(ad|domaincontroller|dc)$') {
+    if ($VmRole -in ('domain', 'dc', 'ad', 'dns', 'domain-controller', 'ad-dns', 'dc-dns') ){
         if ($AdRoleExist.InstallState -ne 'Installed') {
             Write-EventLog -Message 'Installation of Active Directory Domain Services started.' -Source $EventSource -EventLogName $EventLogName
             Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
-            Start-Sleep -Seconds 30
-            
             # Ensure the ADDSDeployment module is installed and available
             Import-Module ADDSDeployment
-            
+
             Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source $EventSource -EventLogName $EventLogName -EntryType information
             Install-ADDSForest -DomainName $DomainName `
                 -DomainNetbiosName $DomainBiosName `
@@ -189,7 +183,7 @@ try {
         }
     }
     else {
-        # Give it some time and wait for the domain controller to be ready
+        # Give it some time and wait for the domain controller to be ready (5 minutes)
         Start-Sleep -Seconds 600 
 
         # Check if the domain server IP address is valid
@@ -200,24 +194,24 @@ try {
 
         Write-EventLog -Message 'Windows Feature Installation and domain join started.' -Source $EventSource -EventLogName $EventLogName -EntryType Information
         Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
+        
         # Configure Windows Firewall to allow SMB, NFS, and SQL Server
         New-NetFirewallRule -DisplayName 'SMB' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 445 -Enabled True
         New-NetFirewallRule -DisplayName 'NFS' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 2049 -Enabled True
         New-NetFirewallRule -DisplayName 'SQL Server' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 1433 -Enabled True
-        
+        Write-EventLog -Message 'Windows Feature Installation has completed' -Source $EventSource -EventLogName $EventLogName -EntryType Information
+
         # Configure NIC to have domain controller / DNS as DNS server.
         $NetworkAdapter = Get-NetAdapter -Name $NetworkAdaptorName
         Set-DnsClientServerAddress -InterfaceIndex $NetworkAdapter.ifIndex -ServerAddresses $DomainServerIp
 
         # Join the computer to the domain and restart the computer
-        Add-Computer -DomainName $DomainName -Credential $Credential
+        Add-Computer -DomainName $DomainName -Credential $Credential -Restart
         Write-EventLog -Message 'Windows Feature Installation has completed' -Source $EventSource -EventLogName $EventLogName -EntryType Information
-        
-        Start-Sleep -Seconds 30
-        Restart-Computer -Force
     }
 }
 catch {
     Write-EventLog -Message $_.Exception.Message -Source $EventSource -EventLogName $EventLogName -EntryType Error
     Write-Error $_.Exception.Message
 }
+Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o"))." -Source "CustomScriptEvent" -EventLogName "Application"
