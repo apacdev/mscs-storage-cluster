@@ -95,11 +95,10 @@ Write-EventLog -Message "Starting installation of roles and features (timestamp:
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
 $EventLogName = "Application"
-
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $EventLogName) }
-
+if (-not (Test-Path -Path "C:\temp")) { New-Item -ItemType Directory -Path "C:\temp" }
 $url = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi"
-$msi = "$env:USERPROFILE\\Desktop\\\PowerShell-7.3.2-win-x64.msi"
+$msi = "c:\\temp\\PowerShell-7.3.2-win-x64.msi"
 
 # Delayed Start (1 minutes) to make sure all component provisioning is ready.
 Start-Sleep -Seconds 60
@@ -109,7 +108,7 @@ Set-TimeZone -Id "Singapore Standard Time"
 
 # Check if the DNS and URI are working correctly (maybe not necessary with delayed execution of the script)
 try {
-    $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 5
+    $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 5 -UseBasicParsing
     if ($response.StatusCode -eq 200) {
         Write-EventLog -Message "DNS and URI are working correctly. Status code: $($response.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Information
     } else {
