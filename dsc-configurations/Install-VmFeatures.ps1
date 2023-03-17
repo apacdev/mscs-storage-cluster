@@ -1,4 +1,13 @@
 <#
+.LICENSE
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+.AUTHOR
+patrick.shim@live.co.kr (Patrick Shim)
+
+.VERSION
+1.0.0
+
 .SYNOPSIS
 Installs PowerShell 7 and necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. Logs events to the Windows event log and catches any exceptions that occur.
 
@@ -75,6 +84,7 @@ Function Write-EventLog {
         [Parameter(Mandatory = $false)]
         [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
+    
     $log = New-Object System.Diagnostics.EventLog($EventLogName)
     $log.Source = $Source
     $log.WriteEntry($Message, $EntryType)
