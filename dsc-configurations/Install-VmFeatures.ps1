@@ -23,6 +23,9 @@ Specifies the NetBIOS name of the domain.
 .PARAMETER DomainServerIp
 Specifies the Private IP Address of the domain server.
 
+.PARAMETER NetworkAdaptorName
+Specifies the name of the network adaptor to use for the cluster network. The default value is `Ethernet`.
+
 .EXAMPLE
 .\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainBiosName CONTOSO -DomainServerIp
 
@@ -52,7 +55,10 @@ param(
     [string] $DomainBiosName,
     
     [Parameter(Mandatory = $true)]
-    [string] $DomainServerIp
+    [string] $DomainServerIp,
+
+    [Parameter(Mandatory = $false)]
+    [string] $NetworkAdaptorName = "Ethernet"
 )
 
 Function Write-EventLog {
@@ -74,18 +80,16 @@ Function Write-EventLog {
     $log.WriteEntry($Message, $EntryType)
 }
 
-# Check whether the event source exists, and 
-# create it if it doesn't exist. Without it, the script would 
-# fail to write events to the event log because the
-# custom event source would not exist.
+# Check whether the event source exists, and create it if it doesn't exist.
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
 $EventLogName = "Application"
+
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $EventLogName) }
 
 $url = 'https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi'
-$dns = 'c:\windows\system32\drivers\etc\hosts'
 $msi = "$env:USERPROFILE\Desktop\PowerShell-7.3.2-win-x64.msi"
+
 # Check if PowerShell 7 is installed by searching for 'pwsh' executable in the PATH
 $pwshPath = Get-Command -Name "pwsh" -ErrorAction SilentlyContinue
 
@@ -126,10 +130,12 @@ try {
         if ($AdRoleExist.InstallState -ne 'Installed') {
             Write-EventLog -Message 'Installation of Active Directory Domain Services started.' -Source $EventSource -EventLogName $EventLogName
             Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
-            Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source $EventSource -EventLogName $EventLogName -EntryType information
             Start-Sleep -Seconds 30
+            
             # Ensure the ADDSDeployment module is installed and available
             Import-Module ADDSDeployment
+            
+            Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source $EventSource -EventLogName $EventLogName -EntryType information
             Install-ADDSForest -DomainName $DomainName `
                 -DomainNetbiosName $DomainBiosName `
                 -DomainMode 'WinThreshold' `
@@ -149,6 +155,7 @@ try {
     else {
         # Give it some time and wait for the domain controller to be ready
         Start-Sleep -Seconds 600 
+
         # Check if the domain server IP address is valid
         if (-not (Test-Connection -ComputerName $DomainServerIp -Count 1 -Quiet)) {
             Write-EventLog -Message "Invalid domain server IP address specified: $DomainServerIp" -Source $EventSource -EventLogName $EventLogName -EntryType Error
@@ -162,14 +169,9 @@ try {
         New-NetFirewallRule -DisplayName 'NFS' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 2049 -Enabled True
         New-NetFirewallRule -DisplayName 'SQL Server' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 1433 -Enabled True
         
-        # Check if the entry already exists in the hosts file
-        $ExistingHostEntry = Get-Content -Path $dns | Where-Object { $_ -match "(?i)^$DomainServerIp\s+$DomainName$" } | Select-Object -First 1
-
-        # Add the domain server IP address and domain name to the hosts file
-        if (-not $ExistingHostEntry) {
-            Add-Content -Path $dns -Value "$DomainServerIp $DomainName"
-            Write-EventLog -Message 'Private IP of Domain Controller added to the Hosts file.' -Source $EventSource -EventLogName $EventLogName -EntryType Information
-        }
+        # Configure NIC to have domain controller / DNS as DNS server.
+        $NetworkAdapter = Get-NetAdapter -Name $NetworkAdaptorName
+        Set-DnsClientServerAddress -InterfaceIndex $NetworkAdapter.ifIndex -ServerAddresses $DomainServerIp
 
         # Join the computer to the domain and restart the computer
         Add-Computer -DomainName $DomainName -Credential $Credential
