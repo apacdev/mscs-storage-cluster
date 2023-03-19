@@ -58,7 +58,7 @@ param(
     [string] $DomainName,
         
     [Parameter(Mandatory = $true)]
-    [string] $DomainBiosName,
+    [string] $DomainNetBiosName,
     
     [Parameter(Mandatory = $true)]
     [string] $DomainServerIp
@@ -115,7 +115,7 @@ Function Wait-DcAvailability {
     
     while ((Get-Date) -lt ($startTime).AddSeconds($TimeoutInSeconds)) {
             
-        if (Test-DCAvailability -ServerIpAddress $ServerIpAddress) { 
+        if (Test-DcAvailability -ServerIpAddress $ServerIpAddress) { 
             return $true
         }
         Start-Sleep -Seconds $IntervalInSeconds
@@ -305,7 +305,7 @@ Function Set-ADDomainServices {
         [Parameter(Mandatory = $true)]
         [string] $DomainName,
         [Parameter(Mandatory = $true)]
-        [string] $DomainBiosName,
+        [string] $DomainNetBiosName,
         [Parameter(Mandatory = $true)]
         [pscredential] $Credential
     )
@@ -318,7 +318,7 @@ Function Set-ADDomainServices {
         Import-Module ADDSDeployment
 
         Install-ADDSForest -DomainName $DomainName `
-            -DomainNetbiosName $DomainBiosName `
+            -DomainNetbiosName $DomainNetBiosName `
             -DomainMode 'WinThreshold' `
             -ForestMode 'WinThreshold' `
             -InstallDns `
@@ -584,12 +584,12 @@ try {
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell","NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
-                -DomainBiosName $DomainNetbiosName `
+                -DomainNetBiosName $DomainNetbiosName `
                 -DomainServerIp $DomainServerIp `
                 -Credential $Credential
         } else {
             Set-ADDomainServices -DomainName $DomainName `
-                -DomainBiosName $DomainNetbiosName `
+                -DomainNetBiosName $DomainNetbiosName `
                 -DomainServerIp $DomainServerIp `
                 -Credential $Credential
         }
@@ -598,7 +598,7 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
 
-        $ready = Wait-DCAvailability ServerIpAddress $DomainServerIp `
+        $ready = Wait-DCAvailability -ServerIpAddress $DomainServerIp `
             -TimeoutInSeconds 300 `
             -IntervalInSeconds 10
 
