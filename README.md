@@ -1,6 +1,5 @@
-# Highly Available Storage Server on Microsoft Clustering Services (MSCS)
+# Highly Available Storage Server on Microsoft Clustering Service
 An Example to Create High Available Failover Cluster using Microsoft Clustering Service with Azure Shared Disk.
-
 
 # Multi-Server Cluster Deployment in Bicep
 This Bicep template deploys a multi-server cluster on Microsoft Azure. The deployment creates three virtual machines (VMs) with a specific VM size, network interfaces, and shared storage configuration.  Custom Script Extension is used to automate configurations of each VMs.
@@ -12,5 +11,5 @@ This Bicep template deploys a multi-server cluster on Microsoft Azure. The deplo
 * Leverages two Azure Availability Zones: Az-01 for VM-01, Az-02 for VM-02 and VM-03
 
 # Usage Example
-```az login```
+```az login
 ```az deployment group create --resource-group <BaseResourceGroupName> --template-file mscs_resources.bicep --parameters param1=value1 param2=value2 ...```
