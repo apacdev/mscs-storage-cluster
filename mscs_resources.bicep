@@ -1,18 +1,29 @@
+targetScope = 'subscription'
 // ************************************************************************************************
 // Role: Azure Bicep Template for Microsoft Cluster Services (MSCS) on Windows Server 2022
 // Author:  Patrick Shim (patrick.shim@live.co.kr)
 // Copyright (C) 2023 by Microsoft Corporation
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ************************************************************************************************
 
-targetScope = 'subscription'
-
 @description('Admin Username for the Virtual Machine and Ad Domain.')
-param admin_name string
+param admin_name string = 'ContosoAdmin'
 
 @description('Admin Password for the Virtual Machine and Ad Domain.')
 @maxLength(18)
 @secure()
-param admin_password string
+param admin_password string = 'P@ssw0rd1234'
 
 @description('Name of the resource group to create.')
 @allowed([
@@ -34,7 +45,7 @@ param mscs_common_resources_name string  = 'mscs_commons_resources'
   'japaneast'
   'koreacentral'
 ])
-param location string = 'koreacentral'
+param location string = 'southeastasia'
 
 @description('Name of LogAnalytics Workspace.')
 param log_space_name string = 'mscs-log-workspace'
@@ -43,7 +54,7 @@ param log_space_name string = 'mscs-log-workspace'
 param automate_name string = 'mscs-vms-automate'
 
 @description('Name of Shared Disk for the nodes.')
-param disk_name string = 'mscs-csv-shared-disk'
+param disk_name string = 'mscs-asd-clusterdisk'
 
 @description('Name of the VM-01.')
 param vm_01_name string = 'mscswvm-01'
@@ -91,10 +102,10 @@ param subnet_v6_01_addr string = 'fd00:db8:deca:deec::/64'
 param subnet_v6_02_addr string = 'fd00:db8:deca:deed::/64'
 
 @description('Domain Name for Active Directory.')
-param domain_name string = 'neostation.org'
+param domain_name string = 'contoso.org'
 
 @description('NetBIOS name for the Ad Domain.')
-param domain_netbios_name string = 'NEOSTATION'
+param domain_netbios_name string = 'CONTOSO'
 
 @description('Private IP address for the Ad Domain Controller.')
 param domain_server_ip string = '172.16.0.100'
@@ -152,7 +163,7 @@ param vm_size string = 'Standard_F4s_v2'
 @description('Name of storage account for the Virtual Machines.')
 @minLength(3)
 @maxLength(24)
-param storage_account_name string = 'mscscommonstoragespace'
+param storage_account_name string = 'mscskrcommonstoragespace'
 
 // create resource group for network resources
 resource mscs_network_resources 'Microsoft.Resources/resourceGroups@2022-09-01' = {
