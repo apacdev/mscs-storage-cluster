@@ -600,15 +600,15 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $true 
 
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
-            Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell","NFS-Client")
+            Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell","DNS","NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -DomainServerIp $DomainServerIpAddress `
+                -DomainServerIpAddress $DomainServerIpAddress `
                 -Credential $Credential
         } else {
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -DomainServerIp $DomainServerIpAddress `
+                -DomainServerIpAddress $DomainServerIpAddress `
                 -Credential $Credential
         }
     } else {
