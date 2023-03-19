@@ -603,12 +603,10 @@ try {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell","DNS","NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -DomainServerIpAddress $DomainServerIpAddress `
                 -Credential $Credential
         } else {
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -DomainServerIpAddress $DomainServerIpAddress `
                 -Credential $Credential
         }
     } else {
