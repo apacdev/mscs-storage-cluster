@@ -1,4 +1,3 @@
-SuppressMessage('PSAvoidUsingPlainTextForPassword', 'Parameter should not use String type')
 <#
 .LICENSE
 Copyright (c) Microsoft Corporation. All rights reserved.
@@ -596,7 +595,8 @@ try {
     Install-PowerShellWithAzModules -Url $url -Msi $msiPath
 
     # Install required Windows Features for Domain Controller Setup
-    if ($VmRole -in ('domain', 'dc', 'ad', 'dns', 'domain-controller', 'ad-dns', 'dc-dns') ) {
+    if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
+        
         Set-RequiredFirewallRules -IsActiveDirectory $true 
 
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
@@ -624,7 +624,7 @@ try {
         if ($ready) {
             Join-DomainIfNotJoined -DomainName $DomainName `
                 -Credential $Credential `
-                -DomainServerIp $DomainServerIpAddress `
+                -DomainServerIpAddress $DomainServerIpAddress `
                 -Reboot $true
 
             Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
