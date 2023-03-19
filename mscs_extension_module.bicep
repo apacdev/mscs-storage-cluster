@@ -41,7 +41,7 @@ resource vm_01_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
     type: 'CustomScriptExtension'
     typeHandlerVersion: '1.9'
     settings: {
-      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
+      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/dsc-configurations/Install-VmFeatures.ps1']
     }
     protectedSettings: {
       commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_01_role} -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
@@ -59,7 +59,7 @@ resource vm_02_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
     typeHandlerVersion: '1.9'
     autoUpgradeMinorVersion: true
     settings: {
-      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
+      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/dsc-configurations/Install-VmFeatures.ps1']
     }
     protectedSettings: {
       commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_02_role} -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
@@ -77,7 +77,7 @@ resource vm_03_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
     typeHandlerVersion: '1.9'
     autoUpgradeMinorVersion: true
     settings: {
-      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
+      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/dsc-configurations/Install-VmFeatures.ps1']
     }
     protectedSettings: {
       commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_03_role} -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
