@@ -14,13 +14,16 @@ Installs PowerShell 7 and necessary roles and features for either a domain contr
 .DESCRIPTION
 This script installs PowerShell 7 on a Windows machine if it's not already installed, and then installs the necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. The script logs events to the Windows event log using a custom event source, and catches and logs any exceptions that occur during the execution of the script.
 
+.PARAMETER VmName
+Specifies the name of the virtual machine.
+
 .PARAMETER VmRole
 Specifies the role of the virtual machine (`domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node).
 
 .PARAMETER AdminName
 Specifies the name of the administrator account for the domain.
 
-.PARAMETER AdminPass
+.PARAMETER AdminPassword
 Specifies the password for the administrator account.
 
 .PARAMETER DomainName
@@ -29,16 +32,16 @@ Specifies the name of the domain.
 .PARAMETER DomainNetBiosName
 Specifies the NetBIOS name of the domain.
 
-.PARAMETER DomainServerIp
+.PARAMETER DomainServerIpAddress
 Specifies the Private IP Address of the domain server.
 
 .EXAMPLE
-.\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIp
+.\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPassword P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
 
 .NOTES
 - This script requires elevated privileges to run, i.e., as an administrator.
 - The `VmRole` parameter must be one of the following: `domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node.
-- The `AdminName` and `AdminPass` parameters must specify the name and password of an administrator account for the domain.
+- The `AdminName` and `AdminPassword` parameters must specify the name and password of an administrator account for the domain.
 #>
 
 param(
@@ -49,7 +52,7 @@ param(
     [string] $AdminName,
         
     [Parameter(Mandatory = $true)]
-    [string] $AdminPass,
+    [string] $AdminPassword,
         
     [Parameter(Mandatory = $true)]
     [string] $DomainName,
@@ -58,10 +61,18 @@ param(
     [string] $DomainNetBiosName,
     
     [Parameter(Mandatory = $true)]
-    [string] $DomainServerIp
+    [string] $DomainServerIpAddress
 )
 
-# function to check if the VM has the specified Windows Feature installed.  Returns true if the feature is installed, false otherwise.
+# Function to check if Az Modules are installed.
+Function Test-AzModulesInstalled {
+    if (Get-Module -Name Az -ListAvailable) {
+        return $true
+    } else {
+        return $false
+    }
+}
+# Function to check if the VM has the specified Windows Feature installed.  Returns true if the feature is installed, false otherwise.
 Function Test-WindowsFeatureInstalled {
     param(
         [Parameter(Mandatory = $true)]
@@ -86,13 +97,13 @@ Function Test-DcAvailability {
 
     if (Test-Connection -ComputerName $ServerIpAddress -Count 1 -Quiet) { 
         try {
-            $domain = Get-ADDomainController -Server $ServerIpAddress
+            Get-ADDomainController -Server $ServerIpAddress
             Write-EventLog -Message "Domain Controller is available." -Source $EventSource -EventLogName $EventLogName -EntryType Information
             return $true
 
         } catch {
+            Write-EventLog -Message "Domain Controller is not available $($_.Exception.Message))." -Source $EventSource -EventLogName $EventLogName -EntryType Error
             return $false
-            Write-EventLog -Message "Domain Controller is not available." -Source $EventSource -EventLogName $EventLogName -EntryType Error
         }
     } else {
         return $false
@@ -120,7 +131,7 @@ Function Wait-DcAvailability {
     return $false
 }
 
-# function to install specified Windows Features.
+# Function to install specified Windows Features.
 Function Install-RequiredWindowsFeatures {
     param(
         [Parameter(Mandatory = $true)]
@@ -147,7 +158,7 @@ Function Install-RequiredWindowsFeatures {
                     -EntryType Information
             }
             catch {
-                Write-EventLog -Message "An error occurred while installing Windows Feature $feature (Error: $_Exception.Message)." `
+                Write-EventLog -Message "An error occurred while installing Windows Feature $feature (Error: $($_.Exception.Message))." `
                     -Source $EventSource `
                     -EventLogName $EventLogName `
                     -EntryType Error
@@ -162,8 +173,8 @@ Function Install-RequiredWindowsFeatures {
     }
 }
 
-# function to check if PowerShell 7 is installed. If not, install it and install the Az module.
-Function Install-PowerShellWithAzModule {
+# Function to check if PowerShell 7 is installed. If not, install it and install the Az module.
+Function Install-PowerShellWithAzModules {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Url,
@@ -199,44 +210,46 @@ Function Install-PowerShellWithAzModule {
                 -EntryType Information
         }
 
-        # contuning to install the Az modules
+        # contuning to install the Az modules.
+        if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
+            Install-PackageProvider -Name NuGet `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
+        
         Write-EventLog -Message "Installing the Az module." `
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Information
 
-        Install-PackageProvider -Name NuGet `
-            -Force `
-            -ErrorAction SilentlyContinue
-
-        if (Get-Module -ListAvailable -Name AzureRM) { 
-            Uninstall-Module -Name AzureRM `
-            -Force `
-            -ErrorAction SilentlyContinue 
-        }
-        # remove the AzureRM module if it exists
-        if (-not (Get-Module -ListAvailable -Name Az)) { 
+        if (-not (Get-Module -Name Az -ListAvailable -ErrorAction SilentlyContinue)) { 
             Install-Module -Name Az `
-            -AllowClobber `
-            -Force `
-            -ErrorAction SilentlyContinue 
+                -Force `
+                -Scope AllUsers `
+                -ErrorAction SilentlyContinue 
         }
 
         Write-EventLog -Message "PowerShell 7 and Az Modules have been installed." `
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Information
-    
+
+        # remove the AzureRM module if it exists
+        if (Get-Module -ListAvailable -Name AzureRM) { 
+            Uninstall-Module -Name AzureRM `
+                -Force `
+                -ErrorAction SilentlyContinue 
+        }
+
     } catch {
-        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules: $_" `
+        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))." `
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Error
-        Write-Error "Error installing PowerShell 7 with Az Modules: $_"
     }
 }
 
-# function to download a file from a URL and retry if the download fails.
+# Function to download a file from a URL and retry if the download fails.
 Function Get-WebResourcesWithRetries {
     param (
         [Parameter(Mandatory = $true)]
@@ -296,7 +309,7 @@ Function Get-WebResourcesWithRetries {
     }
 }
 
-# function to configure the domain controller.
+# Function to configure the domain controller.
 Function Set-ADDomainServices {
     param(
         [Parameter(Mandatory = $true)]
@@ -328,7 +341,7 @@ Function Set-ADDomainServices {
             -EntryType information
     }
     catch {
-        Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $_Exception.Message)." `
+        Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $($_.Exception.Message))." `
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Error
@@ -479,13 +492,13 @@ Function Set-RequiredFirewallRules {
     }
 }
 
-# function to check if the VM is already joined to the domain.
+# Function to check if the VM is already joined to the domain.
 Function Join-DomainIfNotJoined {
     param(
         [Parameter(Mandatory = $true)]
         [string] $DomainName,
         [Parameter(Mandatory = $true)]
-        [string] $DomainServerIp,
+        [string] $DomainServerIpAddress,
         [Parameter(Mandatory = $true)]
         [pscredential] $Credential,
         [Parameter(Mandatory = $false)]
@@ -493,13 +506,13 @@ Function Join-DomainIfNotJoined {
     )
 
     try {
-        $Domain = Get-WmiObject -Class Win32_ComputerSystem `
-            -ComputerName $DomainServerIp `
+        $curruentDomain = Get-WmiObject -Class Win32_ComputerSystem `
+            -ComputerName $DomainServerIpAddress `
             -Credential $Credential
 
-        if ($Domain.Domain -ne $DomainName) {
+        if ($curruentDomain.Domain -ne $DomainName) {
             Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) `
-                -ServerAddresses $DomainServerIp
+                -ServerAddresses $DomainServerIpAddress
 
             Write-EventLog -Message 'Joining the computer to the domain.' `
                 -Source $EventSource `
@@ -514,6 +527,11 @@ Function Join-DomainIfNotJoined {
                 -Source $EventSource `
                 -EventLogName $EventLogName `
                 -EntryType Information
+        } else {
+            Write-EventLog -Message 'The computer is already joined to the domain.' `
+                -Source $EventSource `
+                -EventLogName $EventLogName `
+                -EntryType Information
         }
     }
     catch {
@@ -524,7 +542,7 @@ Function Join-DomainIfNotJoined {
     }
 }
 
-# function to simplify the creation of an event log entry.
+# Function to simplify the creation of an event log entry.
 Function Write-EventLog {
     param(
         [Parameter(Mandatory = $true)]
@@ -554,7 +572,7 @@ $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
 $url = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
+$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPassword -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
 $EventLogName = "Application"
 # Check whether the event source exists, and create it if it doesn't exist.
@@ -572,7 +590,8 @@ try {
         -EventLogName "Application"
     
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
-    Install-PowerShellWithAzModule -Url $url -Msi $msiPath
+
+    Install-PowerShellWithAzModules -Url $url -Msi $msiPath
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -in ('domain', 'dc', 'ad', 'dns', 'domain-controller', 'ad-dns', 'dc-dns') ) {
@@ -582,27 +601,28 @@ try {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell","NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -DomainServerIp $DomainServerIp `
+                -DomainServerIp $DomainServerIpAddress `
                 -Credential $Credential
         } else {
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -DomainServerIp $DomainServerIp `
+                -DomainServerIp $DomainServerIpAddress `
                 -Credential $Credential
         }
     } else {
     # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
+
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
 
-        $ready = Wait-DCAvailability -ServerIpAddress $DomainServerIp `
+        $ready = Wait-DCAvailability -ServerIpAddress $DomainServerIpAddress `
             -TimeoutInSeconds 300 `
             -IntervalInSeconds 10
 
         if ($ready) {
             Join-DomainIfNotJoined -DomainName $DomainName `
                 -Credential $Credential `
-                -DomainServerIp $DomainServerIp `
+                -DomainServerIp $DomainServerIpAddress `
                 -Reboot $true
 
             Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
