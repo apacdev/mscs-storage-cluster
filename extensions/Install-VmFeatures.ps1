@@ -507,8 +507,7 @@ Function Join-DomainIfNotJoined {
 
     try {
         $curruentDomain = Get-WmiObject -Class Win32_ComputerSystem `
-            -ComputerName $DomainServerIpAddress `
-            -Credential $Credential
+            -ComputerName localhost
 
         if ($curruentDomain.Domain -ne $DomainName) {
             Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) `
