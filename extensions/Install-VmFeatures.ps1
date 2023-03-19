@@ -587,8 +587,9 @@ if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
 
 try {
     Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-        -Source "CustomScriptEvent" `
-        -EventLogName "Application"
+        -Source $EventSource `
+        -EventLogName $EventLogName `
+        -EntryType Information
     
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
 
@@ -626,8 +627,9 @@ try {
                 -Reboot $true
 
             Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-                -Source "CustomScriptEvent" `
-                -EventLogName "Application"
+                -Source $EventSource `
+                -EventLogName $EventLogName `
+                -EntryType Information
         }
     }
 }
