@@ -1,3 +1,4 @@
+SuppressMessage('PSAvoidUsingPlainTextForPassword', 'Parameter should not use String type')
 <#
 .LICENSE
 Copyright (c) Microsoft Corporation. All rights reserved.
@@ -6,7 +7,7 @@ Copyright (c) Microsoft Corporation. All rights reserved.
 patrick.shim@live.co.kr (Patrick Shim)
 
 .VERSION
-1.0.0.2
+1.0.0.3
 
 .SYNOPSIS
 Installs PowerShell 7 and necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. Logs events to the Windows event log and catches any exceptions that occur.
@@ -102,7 +103,7 @@ Function Test-DcAvailability {
             return $true
 
         } catch {
-            Write-EventLog -Message "Domain Controller is not available $($_.Exception.Message))." -Source $EventSource -EventLogName $EventLogName -EntryType Error
+            Write-EventLog -Message "Domain Controller is not available (Error: $($_.Exception.Message))" -Source $EventSource -EventLogName $EventLogName -EntryType Error
             return $false
         }
     } else {
@@ -242,7 +243,7 @@ Function Install-PowerShellWithAzModules {
         }
 
     } catch {
-        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))." `
+        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" `
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Error
@@ -341,7 +342,7 @@ Function Set-ADDomainServices {
             -EntryType information
     }
     catch {
-        Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $($_.Exception.Message))." `
+        Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $($_.Exception.Message))" `
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Error
@@ -575,6 +576,7 @@ $timeZone = "Singapore Standard Time"
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPassword -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
 $EventLogName = "Application"
+
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
     [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
@@ -616,7 +618,7 @@ try {
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
 
         $ready = Wait-DCAvailability -ServerIpAddress $DomainServerIpAddress `
-            -TimeoutInSeconds 300 `
+            -TimeoutInSeconds 600 `
             -IntervalInSeconds 10
 
         if ($ready) {
