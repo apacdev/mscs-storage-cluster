@@ -6,7 +6,7 @@ Copyright (c) Microsoft Corporation. All rights reserved.
 patrick.shim@live.co.kr (Patrick Shim)
 
 .VERSION
-1.0.0.1
+1.0.0.2
 
 .SYNOPSIS
 Installs PowerShell 7 and necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. Logs events to the Windows event log and catches any exceptions that occur.
@@ -31,9 +31,6 @@ Specifies the NetBIOS name of the domain.
 
 .PARAMETER DomainServerIp
 Specifies the Private IP Address of the domain server.
-
-.PARAMETER NetworkAdaptorName
-Specifies the name of the network adaptor to use for the cluster network. The default value is `Ethernet`.
 
 .EXAMPLE
 .\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainBiosName CONTOSO -DomainServerIp
@@ -64,12 +61,473 @@ param(
     [string] $DomainBiosName,
     
     [Parameter(Mandatory = $true)]
-    [string] $DomainServerIp,
-
-    [Parameter(Mandatory = $false)]
-    [string] $NetworkAdaptorName = "Ethernet"
+    [string] $DomainServerIp
 )
 
+# function to check if the VM has the specified Windows Feature installed.  Returns true if the feature is installed, false otherwise.
+Function Test-WindowsFeatureInstalled {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $FeatureName
+    )
+
+    $feature = Get-WindowsFeature -Name $FeatureName
+    if ($feature.InstallState -ne "Installed") { 
+        return $false 
+    }
+    else { 
+        return $true 
+    }
+}
+
+# Function to check if Domain Controller is available
+Function Test-DcAvailability {
+    param (
+        [Parameter(Mandatory = $true)]
+        [String] $ServerIpAddress
+    )
+
+    if (Test-Connection -ComputerName $ServerIpAddress -Count 1 -Quiet) { 
+        try {
+            $domain = Get-ADDomainController -Server $ServerIpAddress
+            Write-EventLog -Message "Domain Controller is available." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+            return $true
+
+        } catch {
+            return $false
+            Write-EventLog -Message "Domain Controller is not available." -Source $EventSource -EventLogName $EventLogName -EntryType Error
+        }
+    } else {
+        return $false
+    }
+}
+
+# Function to wait for Domain Controller availability
+Function Wait-DcAvailability {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ServerIpAddress,
+        [int] $TimeoutInSeconds = 60,
+        [int] $IntervalInSeconds = 1
+    )
+    
+    $startTime = Get-Date
+    
+    while ((Get-Date) -lt ($startTime).AddSeconds($TimeoutInSeconds)) {
+            
+        if (Test-DCAvailability -ServerIpAddress $ServerIpAddress) { 
+            return $true
+        }
+        Start-Sleep -Seconds $IntervalInSeconds
+    }
+    return $false
+}
+
+# function to install specified Windows Features.
+Function Install-RequiredWindowsFeatures {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Generic.List[string]] $FeatureList
+    )
+    
+    $toInstallList = New-Object System.Collections.Generic.List[string]
+    $features = Get-WindowsFeature $FeatureList -ErrorAction SilentlyContinue
+    
+    foreach ($feature in $features) {
+        if ($feature.InstallState -ne 'Installed') { 
+            # build a list of features to install
+            $toInstallList.Add($feature.Name)
+        }
+    }
+
+    if ($toInstallList.count -gt 0) {
+        foreach ($feature in $toInstallList) {
+            try {
+                Install-WindowsFeature -Name $feature -IncludeManagementTools -IncludeAllSubFeature
+                Write-EventLog -Message "Windows Feature $feature has been installed." `
+                    -Source $EventSource `
+                    -EventLogName $EventLogName `
+                    -EntryType Information
+            }
+            catch {
+                Write-EventLog -Message "An error occurred while installing Windows Feature $feature (Error: $_Exception.Message)." `
+                    -Source $EventSource `
+                    -EventLogName $EventLogName `
+                    -EntryType Error
+            }
+        }
+    }
+    else {
+        Write-EventLog -Message "Nothing to install. All required features are installed." `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Information
+    }
+}
+
+# function to check if PowerShell 7 is installed. If not, install it and install the Az module.
+Function Install-PowerShellWithAzModule {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Url,
+        [Parameter(Mandatory = $true)]
+        [string] $MsiPath
+    )
+    try {
+        # check if a temp directory for a download exists. if not, create it.
+        if (-not (Test-Path -Path $tempPath)) { 
+            New-Item -Path $tempPath `
+                -ItemType Directory `
+                -Force 
+        }
+        
+        # check if msi installer exists. if yes then skip the download and go to the installation.
+        if (-not (Test-Path -Path $msiPath)) {
+            Get-WebResourcesWithRetries -SrouceUrl $url `
+                -DestinationPath $msiPath
+            
+            Start-Process -FilePath msiexec.exe -ArgumentList "/i $msiPath /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
+            
+            Write-EventLog -Message "Installing PowerShell 7 completed." `
+                -Source $EventSource `
+                -EventLogName $EventLogName `
+                -EntryType Information
+        }
+        else {
+            # if msi installer exists, then just install in.
+            Start-Process -FilePath msiexec.exe -ArgumentList "/i $Msi /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
+            Write-EventLog -Message "Installing PowerShell 7 completed." `
+                -Source $EventSource `
+                -EventLogName $EventLogName `
+                -EntryType Information
+        }
+
+        # contuning to install the Az modules
+        Write-EventLog -Message "Installing the Az module." `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Information
+
+        Install-PackageProvider -Name NuGet `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+        if (Get-Module -ListAvailable -Name AzureRM) { 
+            Uninstall-Module -Name AzureRM `
+            -Force `
+            -ErrorAction SilentlyContinue 
+        }
+        # remove the AzureRM module if it exists
+        if (-not (Get-Module -ListAvailable -Name Az)) { 
+            Install-Module -Name Az `
+            -AllowClobber `
+            -Force `
+            -ErrorAction SilentlyContinue 
+        }
+
+        Write-EventLog -Message "PowerShell 7 and Az Modules have been installed." `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Information
+    
+    } catch {
+        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules: $_" `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Error
+        Write-Error "Error installing PowerShell 7 with Az Modules: $_"
+    }
+}
+
+# function to download a file from a URL and retry if the download fails.
+Function Get-WebResourcesWithRetries {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string] $SrouceUrl,
+
+        [Parameter(Mandatory = $true)]
+        [string] $DestinationPath,
+
+        [int] $MaxRetries = 5
+    )
+
+    $retryCount = 0
+    $completed = $false
+    $response = $null
+
+    while (-not $completed -and $retryCount -lt $MaxRetries) {
+        try {
+            $fileExists = Test-Path $DestinationPath
+            $headers = @{}
+
+            if ($fileExists) {
+                $fileLength = (Get-Item $DestinationPath).Length
+                $headers["Range"] = "bytes=$fileLength-"
+            }
+
+            $response = Invoke-WebRequest -Uri $Url `
+                -Headers $headers `
+                -OutFile $DestinationPath `
+                -UseBasicParsing `
+                -PassThru `
+                -ErrorAction Stop
+
+            if ($response.StatusCode -eq 206 -or $response.StatusCode -eq 200) { 
+                $completed = $true 
+            }
+            else { 
+                $retryCount++ 
+            }
+        }
+        catch {
+            $retryCount++
+            Start-Sleep -Seconds (2 * $retryCount)
+        }
+    }
+
+    if (-not $completed) { 
+        Write-EventLog -Message "Failed to download file from $Url" `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Error
+        } 
+
+    else { Write-EventLog -Message "Download of $Url completed successfully" `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Information
+    }
+}
+
+# function to configure the domain controller.
+Function Set-ADDomainServices {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $DomainName,
+        [Parameter(Mandatory = $true)]
+        [string] $DomainBiosName,
+        [Parameter(Mandatory = $true)]
+        [pscredential] $Credential
+    )
+    try {        
+        Write-EventLog -Message 'Configuring Active Directory Domain Services...' `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Information
+
+        Import-Module ADDSDeployment
+
+        Install-ADDSForest -DomainName $DomainName `
+            -DomainNetbiosName $DomainBiosName `
+            -DomainMode 'WinThreshold' `
+            -ForestMode 'WinThreshold' `
+            -InstallDns `
+            -SafeModeAdministratorPassword $Credential.Password `
+            -Force
+
+        Write-EventLog -Message 'Active Directory Domain Services has been configured.' `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType information
+    }
+    catch {
+        Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $_Exception.Message)." `
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Error
+    }
+}
+
+# Function to set extra VM configurations
+Function Set-DefaultVmEnvironment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $TempFolderPath,
+        [Parameter(Mandatory = $true)]
+        [string] $TimeZone
+    )
+    if (-not (Test-Path -Path $TempFolderPath)) { 
+        New-Item -ItemType Directory `
+            -Path $TempFolderPath 
+    }
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" `
+        -Name "IsInstalled" `
+        -Value 0
+    Set-TimeZone -Id $TimeZone
+    Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
+    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true
+}
+
+# Function to set the common Windows Firewall rules
+Function Set-RequiredFirewallRules {
+    param(
+        [Parameter(Mandatory = $true)]
+        [bool] $IsActiveDirectory
+    )
+
+    $ruleList = [System.Collections.ArrayList] @()
+    
+    $ruleList.Add(@(
+        @{
+            DisplayName = 'PowerShell Remoting'
+            Direction = 'Inbound'
+            Protocol = 'TCP'
+            LocalPort = @(5985, 5986)
+            Enabled = $true
+        },
+        @{
+            DisplayName = 'ICMP'
+            Direction = 'Inbound'
+            Protocol = 'ICMPv4'
+            Enabled = $true
+        },
+        @{
+            DisplayName = 'WinRM'
+            Direction = 'Inbound'
+            Protocol = 'TCP'
+            LocalPort = @(5985, 5986)
+            Enabled = $true
+        }
+    ))
+
+    if ($IsActiveDirectory -eq $true) {
+        $ruleList.Add(@(
+            @{
+                DisplayName = 'DNS'
+                Direction = 'Inbound'
+                Protocol = 'UDP'
+                LocalPort = 53
+                Enabled = $true
+            },
+            @{
+                DisplayName = 'DNS'
+                Direction = 'Inbound'
+                Protocol = 'TCP'
+                LocalPort = 53
+                Enabled = $true
+            },
+            @{
+                DisplayName = 'Kerberos'
+                Direction = 'Inbound'
+                Protocol = 'UDP'
+                LocalPort = 88
+                Enabled = $true
+            },
+            @{
+                DisplayName = 'Kerberos'
+                Direction = 'Inbound'
+                Protocol = 'TCP'
+                LocalPort = 88
+                Enabled = $true
+            }
+        ))
+    } else {
+        $ruleList.Add(@(
+            @{
+                DisplayName = 'SMB'
+                Direction = 'Inbound'
+                Protocol = 'TCP'
+                LocalPort = 445
+                Enabled = $true
+            },
+            @{
+                DisplayName = 'NFS'
+                Direction = 'Inbound'
+                Protocol = 'TCP'
+                LocalPort = 2049
+                Enabled = $true
+            },
+            @{
+                DisplayName = 'SQL Server'
+                Direction = 'Inbound'
+                Protocol = 'TCP'
+                LocalPort = @(1433, 1434)
+                Enabled = $true
+            },
+            @{
+                DisplayName = 'iSCSI Target Server'
+                Direction = 'Inbound'
+                Protocol = 'TCP'
+                LocalPort = 3260
+                Enabled = $true
+            },
+            @{
+                DisplayName = 'TFTP Server'
+                Direction = 'Inbound'
+                Protocol = 'UDP'
+                LocalPort = 69
+                Enabled = $true
+            }
+        ))
+    }
+
+    # Configure Windows Firewall
+    $ruleList | ForEach-Object {
+        $_ | ForEach-Object {
+            $rule = $_
+            $ruleName = $rule.DisplayName
+            $ruleExists = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+            if (-not $ruleExists) {
+                $params  = @{
+                    DisplayName = $ruleName
+                    Direction   = $rule.Direction
+                    Protocol    = $rule.Protocol
+                    Enabled     = if ($rule.Enabled) { 'True' } else { 'False' }
+                }
+                if ($rule.LocalPort) { $params.LocalPort = $rule.LocalPort }
+                New-NetFirewallRule @params -ErrorAction SilentlyContinue
+                Write-EventLog -Message "Created Windows Firewall rule: $ruleName" -Source $EventSource -EventLogName $EventLogName -EntryType Information
+            } 
+        }
+    }
+}
+
+# function to check if the VM is already joined to the domain.
+Function Join-DomainIfNotJoined {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $DomainName,
+        [Parameter(Mandatory = $true)]
+        [string] $DomainServerIp,
+        [Parameter(Mandatory = $true)]
+        [pscredential] $Credential,
+        [Parameter(Mandatory = $false)]
+        [bool] $Reboot = $true
+    )
+
+    try {
+        $Domain = Get-WmiObject -Class Win32_ComputerSystem `
+            -ComputerName $DomainServerIp `
+            -Credential $Credential
+
+        if ($Domain.Domain -ne $DomainName) {
+            Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) `
+                -ServerAddresses $DomainServerIp
+
+            Write-EventLog -Message 'Joining the computer to the domain.' `
+                -Source $EventSource `
+                -EventLogName $EventLogName `
+                -EntryType Information
+
+            Add-Computer -DomainName $DomainName `
+                -Credential $Credential `
+                -Restart:$Reboot
+
+            Write-EventLog -Message 'Joining the computer to the domain has completed.' `
+                -Source $EventSource `
+                -EventLogName $EventLogName `
+                -EntryType Information
+        }
+    }
+    catch {
+        Write-EventLog -Message $_.Exception.Message 
+            -Source $EventSource `
+            -EventLogName $EventLogName `
+            -EntryType Error
+    }
+}
+
+# function to simplify the creation of an event log entry.
 Function Write-EventLog {
     param(
         [Parameter(Mandatory = $true)]
@@ -90,126 +548,75 @@ Function Write-EventLog {
     $log.WriteEntry($Message, $EntryType)
 }
 
-Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -Source "CustomScriptEvent" -EventLogName "Application"
-# Check whether the event source exists, and create it if it doesn't exist.
+############################################################################################################
+# Variable Definitions
+############################################################################################################
+
+$tempPath = "C:\\Temp"
+$msi = "PowerShell-7.3.2-win-x64.msi"
+$msiPath = "$tempPath\\$msi"
+$url = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
+$timeZone = "Singapore Standard Time"
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 $EventSource = "CustomScriptEvent"
 $EventLogName = "Application"
-if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $EventLogName) }
-if (-not (Test-Path -Path "C:\temp")) { New-Item -ItemType Directory -Path "C:\temp" }
-$url = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/PowerShell-7.3.2-win-x64.msi"
-$msi = "c:\\temp\\PowerShell-7.3.2-win-x64.msi"
-
-# Delayed Start (1 minutes) to make sure all component provisioning is ready.
-Start-Sleep -Seconds 60
-
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0
-Set-TimeZone -Id "Singapore Standard Time"
-
-# Check if the DNS and URI are working correctly (maybe not necessary with delayed execution of the script)
-try {
-    $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 5 -UseBasicParsing
-    if ($response.StatusCode -eq 200) {
-        Write-EventLog -Message "DNS and URI are working correctly. Status code: $($response.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Information
-    } else {
-        Write-EventLog -Message "DNS and URI are not working correctly. Status code: $($response.StatusCode)" -Source $EventSource -EventLogName $EventLogName -EntryType Warning
-        return
-    }
-} catch {
-    Write-EventLog -Message "Error checking DNS and URI: $_" -Source $EventSource -EventLogName $EventLogName -EntryType Error
+# Check whether the event source exists, and create it if it doesn't exist.
+if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
+    [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
 }
 
-# Check if PowerShell 7 is installed by searching for 'pwsh' executable in the PATH
-$pwshPath = Get-Command -Name "pwsh" -ErrorAction SilentlyContinue
+############################################################################################################
+# Execution Body
+############################################################################################################
 
-if (-not $pwshPath) {
-
-    Write-EventLog -Message 'Installation of PowerShell 7 started.' -Source $EventSource -EventLogName $EventLogName
+try {
+    Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
+        -Source "CustomScriptEvent" `
+        -EventLogName "Application"
     
-    if (-not (Test-Path -Path $msi)) {
-        try {
-            Invoke-WebRequest -Uri $url -OutFile $msi -UseBasicParsing -ErrorAction Stop
-            Write-EventLog -Message 'PowerShell 7.3.2 downloaded successfully.' -Source $EventSource -EventLogName $EventLogName
-            msiexec.exe /package $msi /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1
-            write-EventLog -Message 'Installation of PowerShell 7 is completed.' -Source $EventSource -EventLogName $EventLogName
-            Install-PackageProvider -Name NuGet -Force
-            Install-Module -Name Az -AllowClobber -Force
-            Write-EventLog -Message 'Installation of Az module is completed.' -Source $EventSource -EventLogName $EventLogName
-     
-        } catch {
-            Write-EventLog -Message "Error downloading PowerShell 7.3.2: $_" -Source $EventSource -EventLogName $EventLogName
-            Write-Error "Error downloading PowerShell 7.3.2: $_"
+    Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
+    Install-PowerShellWithAzModule -Url $url -Msi $msiPath
+
+    # Install required Windows Features for Domain Controller Setup
+    if ($VmRole -in ('domain', 'dc', 'ad', 'dns', 'domain-controller', 'ad-dns', 'dc-dns') ) {
+        Set-RequiredFirewallRules -IsActiveDirectory $true 
+
+        if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
+            Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell","NFS-Client")
+            Set-ADDomainServices -DomainName $DomainName `
+                -DomainBiosName $DomainNetbiosName `
+                -DomainServerIp $DomainServerIp `
+                -Credential $Credential
+        } else {
+            Set-ADDomainServices -DomainName $DomainName `
+                -DomainBiosName $DomainNetbiosName `
+                -DomainServerIp $DomainServerIp `
+                -Credential $Credential
         }
-    }
-}
+    } else {
+    # Install required Windows Features for Failover Cluster and File Server Setup
+        Set-RequiredFirewallRules -IsActiveDirectory $false
+        Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
 
-try {
-    # Configure Windows Firewall to allow PowerShell Remoting, ICMP, SMB, NFS, and WinRM
-    New-NetFirewallRule -DisplayName 'PowerShell Remoting' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985, 5986 -Enabled True
-    New-NetFirewallRule -DisplayName 'ICMP' -Direction Inbound -Action Allow -Protocol ICMPv4 -Enabled True
-    New-NetFirewallRule -DisplayName 'WinRM' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5985, 5986 -Enabled True
-    Write-EventLog -Message 'Windows Firewall rules for PowerShell Remoting, ICMP, SMB, NFS, and WinRM are now configured.' -Source $EventSource -EventLogName $EventLogName
+        $ready = Wait-DCAvailability ServerIpAddress $DomainServerIp `
+            -TimeoutInSeconds 300 `
+            -IntervalInSeconds 10
 
-    # Configure WSMan to allow unencrypted traffic
-    Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
-    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true
+        if ($ready) {
+            Join-DomainIfNotJoined -DomainName $DomainName `
+                -Credential $Credential `
+                -DomainServerIp $DomainServerIp `
+                -Reboot $true
 
-    $AdRoleExist = Get-WindowsFeature -Name AD-Domain-Services -ErrorAction SilentlyContinue
-
-    if ($VmRole -in ('domain', 'dc', 'ad', 'dns', 'domain-controller', 'ad-dns', 'dc-dns') ){
-        if ($AdRoleExist.InstallState -ne 'Installed') {
-            Write-EventLog -Message 'Installation of Active Directory Domain Services started.' -Source $EventSource -EventLogName $EventLogName
-            Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeAllSubFeature -IncludeManagementTools
-            # Ensure the ADDSDeployment module is installed and available
-            Import-Module ADDSDeployment
-
-            Write-EventLog -Message 'Installation of Active Directory Domain Services is now completed.' -Source $EventSource -EventLogName $EventLogName -EntryType information
-            Install-ADDSForest -DomainName $DomainName `
-                -DomainNetbiosName $DomainBiosName `
-                -DomainMode 'WinThreshold' `
-                -ForestMode 'WinThreshold' `
-                -InstallDns `
-                -SafeModeAdministratorPassword $Credential.Password `
-                -Force
-
-            # Configure Windws Firewall to allow DNS and all Domain Controller related ports
-            New-NetFirewallRule -DisplayName 'DNS' -Direction Inbound -Action Allow -Protocol UDP -LocalPort 53 -Enabled True
-            New-NetFirewallRule -DisplayName 'DNS' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 53 -Enabled True
-            New-NetFirewallRule -DisplayName 'Kerberos' -Direction Inbound -Action Allow -Protocol UDP -LocalPort 88 -Enabled True
-            New-NetFirewallRule -DisplayName 'Kerberos' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 88 -Enabled True
-            Write-EventLog -Message 'Configuration of Active Directory Domain Services is now completed.' -Source $EventSource -EventLogName $EventLogName -EntryType information
+            Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
+                -Source "CustomScriptEvent" `
+                -EventLogName "Application"
         }
-    }
-    else {
-        # Give it some time and wait for the domain controller to be ready (5 minutes)
-        Start-Sleep -Seconds 600 
-
-        # Check if the domain server IP address is valid
-        if (-not (Test-Connection -ComputerName $DomainServerIp -Count 1 -Quiet)) {
-            Write-EventLog -Message "Invalid domain server IP address specified: $DomainServerIp" -Source $EventSource -EventLogName $EventLogName -EntryType Error
-            return
-        }
-
-        Write-EventLog -Message 'Windows Feature Installation and domain join started.' -Source $EventSource -EventLogName $EventLogName -EntryType Information
-        Install-WindowsFeature -Name Failover-Clustering, FS-FileServer -IncludeManagementTools -IncludeAllSubFeature
-        
-        # Configure Windows Firewall to allow SMB, NFS, and SQL Server
-        New-NetFirewallRule -DisplayName 'SMB' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 445 -Enabled True
-        New-NetFirewallRule -DisplayName 'NFS' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 2049 -Enabled True
-        New-NetFirewallRule -DisplayName 'SQL Server' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 1433 -Enabled True
-        Write-EventLog -Message 'Windows Feature Installation has completed' -Source $EventSource -EventLogName $EventLogName -EntryType Information
-
-        # Configure NIC to have domain controller / DNS as DNS server.
-        $NetworkAdapter = Get-NetAdapter -Name $NetworkAdaptorName
-        Set-DnsClientServerAddress -InterfaceIndex $NetworkAdapter.ifIndex -ServerAddresses $DomainServerIp
-
-        # Join the computer to the domain and restart the computer
-        Add-Computer -DomainName $DomainName -Credential $Credential -Restart
-        Write-EventLog -Message 'Windows Feature Installation has completed' -Source $EventSource -EventLogName $EventLogName -EntryType Information
     }
 }
 catch {
-    Write-EventLog -Message $_.Exception.Message -Source $EventSource -EventLogName $EventLogName -EntryType Error
-    Write-Error $_.Exception.Message
+    Write-EventLog -Message $_.Exception.Message `
+        -Source $EventSource `
+        -EventLogName $EventLogName `
+        -EntryType Error
 }
-Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -Source "CustomScriptEvent" -EventLogName "Application"
