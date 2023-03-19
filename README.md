@@ -11,5 +11,7 @@ This Bicep template deploys a multi-server cluster on Microsoft Azure. The deplo
 * Leverages two Azure Availability Zones: Az-01 for VM-01, Az-02 for VM-02 and VM-03
 
 # Usage Example
-``` az login
-az deployment group create --resource-group <BaseResourceGroupName> --template-file mscs_resources.bicep --parameters param1=value1 param2=value2 ... ```
+```
+az login
+az deployment group create --resource-group <BaseResourceGroupName> --template-file mscs_resources.bicep --parameters param1=value1 param2=value2 ... 
+```
