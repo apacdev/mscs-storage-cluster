@@ -26,22 +26,19 @@ Specifies the password for the administrator account.
 .PARAMETER DomainName
 Specifies the name of the domain.
 
-.PARAMETER DomainBiosName
+.PARAMETER DomainNetBiosName
 Specifies the NetBIOS name of the domain.
 
 .PARAMETER DomainServerIp
 Specifies the Private IP Address of the domain server.
 
 .EXAMPLE
-.\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainBiosName CONTOSO -DomainServerIp
+.\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIp
 
 .NOTES
 - This script requires elevated privileges to run, i.e., as an administrator.
 - The `VmRole` parameter must be one of the following: `domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node.
 - The `AdminName` and `AdminPass` parameters must specify the name and password of an administrator account for the domain.
-- The `DomainName` parameter must specify the name of the domain.
-- The `DomainBiosName` parameter must specify the NetBIOS name of the domain.
-- The `DomainServerIp` parameter must specify the Private IP Address of the domain server.
 #>
 
 param(
