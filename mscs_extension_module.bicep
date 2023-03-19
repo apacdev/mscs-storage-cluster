@@ -12,10 +12,13 @@ param admin_password string
 param location string
 param domain_name string
 param domain_netbios_name string
-param domain_server_ip string = '172.16.0.100'
-param vm_01_name string = 'mscswvm-01'
-param vm_02_name string = 'mscswvm-02'
-param vm_03_name string = 'mscswvm-03'
+param domain_server_ip string
+param vm_01_role string
+param vm_02_role string
+param vm_03_role string
+param vm_01_name string
+param vm_02_name string
+param vm_03_name string
 
 resource vm_01_resource 'Microsoft.Compute/virtualMachines@2022-11-01' existing = {
   name: vm_01_name
@@ -41,7 +44,7 @@ resource vm_01_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
       fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/dsc-configurations/Install-VmFeatures.ps1']
     }
     protectedSettings: {
-      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole domain -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
+      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_01_role} -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
     }
   }
 }
@@ -59,7 +62,7 @@ resource vm_02_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
       fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/dsc-configurations/Install-VmFeatures.ps1']
     }
     protectedSettings: {
-      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole failover -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
+      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_02_role} -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
     }
   }
 }
@@ -77,7 +80,7 @@ resource vm_03_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
       fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/dsc-configurations/Install-VmFeatures.ps1']
     }
     protectedSettings: {
-      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole failover -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
+      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_03_role} -AdminName ${admin_name} -AdminPassword ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip}'
     }
   }
 }

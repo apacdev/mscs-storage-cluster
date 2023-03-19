@@ -27,7 +27,7 @@ param mscs_storage_resources_name string = 'mscs_storage_resources'
 param mscs_compute_resources_name string = 'mscs_compute_resources'
 param mscs_common_resources_name string  = 'mscs_commons_resources'
 
-@description('Location for all resources.')
+@description('Location for resources.')
 @allowed([
   'westus2'
   'southeastasia'
@@ -53,6 +53,15 @@ param vm_02_name string = 'mscswvm-02'
 
 @description('Name of the VM-03.')
 param vm_03_name string = 'mscswvm-03'
+
+@description('Role of the VM-01.')
+param vm_01_role string = 'ad-domain'
+
+@description('Role of the VM-02.')
+param vm_02_role string = 'cluster-node'
+
+@description('Role of the VM-03.')
+param vm_03_role string = 'cluster-node'
 
 @description('Internal IP address for the VM-01.')
 param iip_v4_01_addr string = '172.16.0.100'
@@ -283,6 +292,9 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     vm_01_name: vm_01_name
     vm_02_name: vm_02_name
     vm_03_name: vm_03_name
+    vm_01_role: vm_01_role
+    vm_02_role: vm_02_role
+    vm_03_role: vm_03_role
     domain_name: domain_name
     domain_netbios_name: domain_netbios_name
     domain_server_ip: domain_server_ip
