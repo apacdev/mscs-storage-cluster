@@ -74,7 +74,12 @@ param(
     [string] $DomainNetBiosName,
     
     [Parameter(Mandatory = $true)]
-    [string] $DomainServerIpAddress
+    [string] $DomainServerIpAddress,
+
+    [Parameter(Mandatory = $false)]
+    [hashtable] $VmIpMap = @{"mscswvm-01" = "172.16.0.100"
+                             "mscswvm-02" = "172.16.1.101"
+                             "mscswvm-03" = "172.16.1.102"}
 )
 
 # Function to check if Az Modules are installed.
@@ -111,27 +116,27 @@ Function Test-DcAvailability {
     )
     
     if ((Test-NetConnection -ComputerName $ServerIpAddress -InformationLevel Detailed -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).PingSucceeded) { 
-        Write-EventLog -Message "Domain Controller is reachable via ICMP." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        Write-EventLog -Message "Domain Controller is reachable via ICMP." -Source $eventSource -EventLogName $eventLogName -EntryType Information
 
         if ((Test-NetConnection -ComputerName $ServerIpAddress -Port 53 -InformationLevel Detailed -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).TcpTestSucceeded) {
-            Write-EventLog -Message "TCP Ping to DNS is reachable." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+            Write-EventLog -Message "TCP Ping to DNS is reachable." -Source $eventSource -EventLogName $eventLogName -EntryType Information
    
             try {
                 Get-ADDomainController -Server $ServerIpAddress
-                Write-EventLog -Message "Domain Controller is available." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+                Write-EventLog -Message "Domain Controller is available." -Source $eventSource -EventLogName $eventLogName -EntryType Information
                 return $true
             }
             catch {
-                Write-EventLog -Message "Domain Controller is not available (Error: $($_.Exception.Message))" -Source $EventSource -EventLogName $EventLogName -EntryType Error
+                Write-EventLog -Message "Domain Controller is not available (Error: $($_.Exception.Message))" -Source $eventSource -EventLogName $eventLogName -EntryType Error
                 return $false
             }
         } else {
-            Write-EventLog -Message "TCP Ping to DNS is not reachable." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+            Write-EventLog -Message "TCP Ping to DNS is not reachable." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             return $false
         }
     }
     else {
-        Write-EventLog -Message "Domain Controller is not reachable." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        Write-EventLog -Message "Domain Controller is not reachable." -Source $eventSource -EventLogName $eventLogName -EntryType Information
         return $false
     }
 }
@@ -179,22 +184,22 @@ Function Install-RequiredWindowsFeatures {
             try {
                 Install-WindowsFeature -Name $feature -IncludeManagementTools -IncludeAllSubFeature
                 Write-EventLog -Message "Windows Feature $feature has been installed." `
-                    -Source $EventSource `
-                    -EventLogName $EventLogName `
+                    -Source $eventSource `
+                    -EventLogName $eventLogName `
                     -EntryType Information
             }
             catch {
                 Write-EventLog -Message "An error occurred while installing Windows Feature $feature (Error: $($_.Exception.Message))." `
-                    -Source $EventSource `
-                    -EventLogName $EventLogName `
+                    -Source $eventSource `
+                    -EventLogName $eventLogName `
                     -EntryType Error
             }
         }
     }
     else {
         Write-EventLog -Message "Nothing to install. All required features are installed." `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Information
     }
 }
@@ -223,16 +228,16 @@ Function Install-PowerShellWithAzModules {
             Start-Process -FilePath msiexec.exe -ArgumentList "/i $msiPath /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
             
             Write-EventLog -Message "Installing PowerShell 7 completed." `
-                -Source $EventSource `
-                -EventLogName $EventLogName `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
                 -EntryType Information
         }
         else {
             # if msi installer exists, then just install in.
             Start-Process -FilePath msiexec.exe -ArgumentList "/i $Msi /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
             Write-EventLog -Message "Installing PowerShell 7 completed." `
-                -Source $EventSource `
-                -EventLogName $EventLogName `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
                 -EntryType Information
         }
 
@@ -244,8 +249,8 @@ Function Install-PowerShellWithAzModules {
         }
         
         Write-EventLog -Message "Installing the Az module." `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Information
 
         if (-not (Get-Module -Name Az -ListAvailable -ErrorAction SilentlyContinue)) { 
@@ -256,8 +261,8 @@ Function Install-PowerShellWithAzModules {
         }
 
         Write-EventLog -Message "PowerShell 7 and Az Modules have been installed." `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Information
 
         # remove the AzureRM module if it exists
@@ -270,8 +275,8 @@ Function Install-PowerShellWithAzModules {
     }
     catch {
         Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Error
     }
 }
@@ -324,15 +329,15 @@ Function Get-WebResourcesWithRetries {
 
     if (-not $completed) { 
         Write-EventLog -Message "Failed to download file from $Url" `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Error
     } 
 
     else {
         Write-EventLog -Message "Download of $Url completed successfully" `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Information
     }
 }
@@ -349,8 +354,8 @@ Function Set-ADDomainServices {
     )
     try {        
         Write-EventLog -Message 'Configuring Active Directory Domain Services...' `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Information
 
         Import-Module ADDSDeployment
@@ -364,14 +369,14 @@ Function Set-ADDomainServices {
             -Force
 
         Write-EventLog -Message 'Active Directory Domain Services has been configured.' `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType information
     }
     catch {
         Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $($_.Exception.Message))" `
-            -Source $EventSource `
-            -EventLogName $EventLogName `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Error
     }
 }
@@ -385,15 +390,13 @@ Function Set-DefaultVmEnvironment {
         [string] $TimeZone
     )
     if (-not (Test-Path -Path $TempFolderPath)) { 
-        New-Item -ItemType Directory `
-            -Path $TempFolderPath 
+        New-Item -ItemType Directory -Path $TempFolderPath 
     }
-    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" `
-        -Name "IsInstalled" `
-        -Value 0
+
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0
     Set-TimeZone -Id $TimeZone
     Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
-    Set-Item -Path WSMan:\localhost\Service\AllowUnencrypted -Value $true
+    Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
 }
 
 # Function to set the common Windows Firewall rules
@@ -515,14 +518,14 @@ Function Set-RequiredFirewallRules {
                 }
                 if ($rule.LocalPort) { $params.LocalPort = $rule.LocalPort }
                 New-NetFirewallRule @params -ErrorAction SilentlyContinue
-                Write-EventLog -Message "Created Windows Firewall rule: $ruleName" -Source $EventSource -EventLogName $EventLogName -EntryType Information
+                Write-EventLog -Message "Created Windows Firewall rule: $ruleName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
             } 
         }
     }
 }
 
 # Function to check if the VM is already joined to the domain.
-Function Join-DomainIfNotJoined {
+Function Join-ADDomain {
     param(
         [Parameter(Mandatory = $true)]
         [string] $DomainName,
@@ -543,8 +546,8 @@ Function Join-DomainIfNotJoined {
                 -ServerAddresses $DomainServerIpAddress
 
             Write-EventLog -Message 'Joining the computer to the domain.' `
-                -Source $EventSource `
-                -EventLogName $EventLogName `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
                 -EntryType Information
 
             Add-Computer -DomainName $DomainName `
@@ -552,21 +555,21 @@ Function Join-DomainIfNotJoined {
                 -Restart:$Reboot
 
             Write-EventLog -Message 'Joining the computer to the domain has completed.' `
-                -Source $EventSource `
-                -EventLogName $EventLogName `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
                 -EntryType Information
         }
         else {
             Write-EventLog -Message 'The computer is already joined to the domain.' `
-                -Source $EventSource `
-                -EventLogName $EventLogName `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
                 -EntryType Information
         }
     }
     catch {
         Write-EventLog -Message $_.Exception.Message 
-        -Source $EventSource `
-            -EventLogName $EventLogName `
+        -Source $eventSource `
+            -EventLogName $eventLogName `
             -EntryType Error
     }
 }
@@ -581,16 +584,44 @@ Function Write-EventLog {
         [string] $Source,
 
         [Parameter(Mandatory = $true)]
-        [string] $EventLogName,
+        [string] $eventLogName,
 
         [Parameter(Mandatory = $false)]
         [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
     
-    $log = New-Object System.Diagnostics.EventLog($EventLogName)
+    $log = New-Object System.Diagnostics.EventLog($eventLogName)
     $log.Source = $Source
     $log.WriteEntry($Message, $EntryType)
 }
+
+# Function to register schduled task on ad domain server to remote into the VMs to run domain join commands
+Function Set-FirstLogonTask
+{
+    param (
+        [Parameter(Mandatory = $false)]
+        [string] $RemoteScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1$randomQueryString",
+        [Parameter(Mandatory = $true)]
+        [hashtable] $ServerList,
+        [Parameter(Mandatory = $true)]
+        [string] $DomainName,
+        [Parameter(Mandatory = $true)]
+        [string] $DomainServerIpAddress,
+        [Parameter(Mandatory = $true)]
+        [pscredential] $Credential
+    )
+
+    $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $Credential.UserName
+    $principal = New-ScheduledTaskPrincipal -UserId $Credential.UserName -RunLevel Highest
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"& {`$Script = [scriptblock]::Create((New-Object System.Net.WebClient).DownloadString('$RemoteScriptUrl')); Invoke-Command -ScriptBlock `$Script -ArgumentList '$ServerList', '$DomainName', '$DomainServerIpAddress', '$Credential'}`""
+    $settings  = New-ScheduledTaskSettingsSet -Compatibility Win8 -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+    Register-ScheduledTask -TaskName $taskName -Trigger $trigger -Principal $principal -Settings $settings -Action $action
+    $task = Get-ScheduledTask -TaskName $taskName
+    $task.Author = "Patrick Shim"
+    $task.Description = "A task that runs a PowerShell script at logon and deletes itself after successful execution."
+    $task | Set-ScheduledTask
+}
+
 
 ############################################################################################################
 # Variable Definitions
@@ -599,15 +630,17 @@ Function Write-EventLog {
 $tempPath = "C:\\Temp"
 $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
-$url = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
+$powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPassword -AsPlainText -Force))
-$EventSource = "CustomScriptEvent"
-$EventLogName = "Application"
+$credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPassword -AsPlainText -Force))
+$eventSource = "CustomScriptEvent"
+$eventLogName = "Application"
+$randomQueryString = "?$(Get-Random)"
+$remoteScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1$randomQueryString"
 
 # Check whether the event source exists, and create it if it doesn't exist.
-if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
-    [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
+if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
+    [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $eventLogName)
 }
 
 ############################################################################################################
@@ -616,57 +649,42 @@ if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
 
 try {
     Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-        -Source $EventSource `
-        -EventLogName $EventLogName `
+        -Source $eventSource `
+        -EventLogName $eventLogName `
         -EntryType Information
     
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
 
-    Install-PowerShellWithAzModules -Url $url -Msi $msiPath
+    Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
         
         Set-RequiredFirewallRules -IsActiveDirectory $true 
-
+        
+        Set-FirstLogonTask -ServerList $ServerList -DomainName $DomainName -Credential $credential -DomainServerIpAddress $DomainServerIpAddress
+        
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -Credential $Credential
+                -Credential $credential
         }
         else {
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
-                -Credential $Credential
+                -Credential $credential
         }
     }
     else {
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
-
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
-
-        $ready = Wait-DCAvailability -ServerIpAddress $DomainServerIpAddress `
-            -TimeoutInSeconds 1200 `
-            -IntervalInSeconds 5
-
-        if ($ready) {
-            Join-DomainIfNotJoined -DomainName $DomainName `
-                -Credential $Credential `
-                -DomainServerIpAddress $DomainServerIpAddress `
-                -Reboot $true
-
-            Write-EventLog -Message "Installation of roles and features completed (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-                -Source $EventSource `
-                -EventLogName $EventLogName `
-                -EntryType Information
-        }
     }
 }
 catch {
     Write-EventLog -Message $_.Exception.Message `
-        -Source $EventSource `
-        -EventLogName $EventLogName `
+        -Source $eventSource `
+        -EventLogName $eventLogName `
         -EntryType Error
 }

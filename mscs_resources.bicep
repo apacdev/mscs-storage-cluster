@@ -294,6 +294,9 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     vm_01_role: vm_01_role
     vm_02_role: vm_02_role
     vm_03_role: vm_03_role
+    iipv4_01_address: iip_v4_01_addr
+    iipv4_02_address: iip_v4_02_addr
+    iipv4_03_address: iip_v4_03_addr
     domain_name: domain_name
     domain_netbios_name: domain_netbios_name
     domain_server_ip: domain_server_ip
