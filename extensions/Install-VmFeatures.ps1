@@ -81,10 +81,12 @@ param(
 Function Test-AzModulesInstalled {
     if (Get-Module -Name Az -ListAvailable) {
         return $true
-    } else {
+    }
+    else {
         return $false
     }
 }
+
 # Function to check if the VM has the specified Windows Feature installed.  Returns true if the feature is installed, false otherwise.
 Function Test-WindowsFeatureInstalled {
     param(
@@ -107,18 +109,29 @@ Function Test-DcAvailability {
         [Parameter(Mandatory = $true)]
         [String] $ServerIpAddress
     )
+    
+    if ((Test-NetConnection -ComputerName $ServerIpAddress -InformationLevel Detailed -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).PingSucceeded) { 
+        Write-EventLog -Message "Domain Controller is reachable via ICMP." -Source $EventSource -EventLogName $EventLogName -EntryType Information
 
-    if (Test-Connection -ComputerName $ServerIpAddress -Count 1 -Quiet) { 
-        try {
-            Get-ADDomainController -Server $ServerIpAddress
-            Write-EventLog -Message "Domain Controller is available." -Source $EventSource -EventLogName $EventLogName -EntryType Information
-            return $true
-
-        } catch {
-            Write-EventLog -Message "Domain Controller is not available (Error: $($_.Exception.Message))" -Source $EventSource -EventLogName $EventLogName -EntryType Error
+        if ((Test-NetConnection -ComputerName $ServerIpAddress -Port 53 -InformationLevel Detailed -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).TcpTestSucceeded) {
+            Write-EventLog -Message "TCP Ping to DNS is reachable." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+   
+            try {
+                Get-ADDomainController -Server $ServerIpAddress
+                Write-EventLog -Message "Domain Controller is available." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+                return $true
+            }
+            catch {
+                Write-EventLog -Message "Domain Controller is not available (Error: $($_.Exception.Message))" -Source $EventSource -EventLogName $EventLogName -EntryType Error
+                return $false
+            }
+        } else {
+            Write-EventLog -Message "TCP Ping to DNS is not reachable." -Source $EventSource -EventLogName $EventLogName -EntryType Information
             return $false
         }
-    } else {
+    }
+    else {
+        Write-EventLog -Message "Domain Controller is not reachable." -Source $EventSource -EventLogName $EventLogName -EntryType Information
         return $false
     }
 }
@@ -254,7 +267,8 @@ Function Install-PowerShellWithAzModules {
                 -ErrorAction SilentlyContinue 
         }
 
-    } catch {
+    }
+    catch {
         Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" `
             -Source $EventSource `
             -EventLogName $EventLogName `
@@ -313,9 +327,10 @@ Function Get-WebResourcesWithRetries {
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Error
-        } 
+    } 
 
-    else { Write-EventLog -Message "Download of $Url completed successfully" `
+    else {
+        Write-EventLog -Message "Download of $Url completed successfully" `
             -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Information
@@ -391,97 +406,98 @@ Function Set-RequiredFirewallRules {
     $ruleList = [System.Collections.ArrayList] @()
     
     $ruleList.Add(@(
-        @{
-            DisplayName = 'PowerShell Remoting'
-            Direction = 'Inbound'
-            Protocol = 'TCP'
-            LocalPort = @(5985, 5986)
-            Enabled = $true
-        },
-        @{
-            DisplayName = 'ICMP'
-            Direction = 'Inbound'
-            Protocol = 'ICMPv4'
-            Enabled = $true
-        },
-        @{
-            DisplayName = 'WinRM'
-            Direction = 'Inbound'
-            Protocol = 'TCP'
-            LocalPort = @(5985, 5986)
-            Enabled = $true
-        }
-    ))
+            @{
+                DisplayName = 'PowerShell Remoting'
+                Direction   = 'Inbound'
+                Protocol    = 'TCP'
+                LocalPort   = @(5985, 5986)
+                Enabled     = $true
+            },
+            @{
+                DisplayName = 'ICMP'
+                Direction   = 'Inbound'
+                Protocol    = 'ICMPv4'
+                Enabled     = $true
+            },
+            @{
+                DisplayName = 'WinRM'
+                Direction   = 'Inbound'
+                Protocol    = 'TCP'
+                LocalPort   = @(5985, 5986)
+                Enabled     = $true
+            }
+        ))
 
     if ($IsActiveDirectory -eq $true) {
         $ruleList.Add(@(
-            @{
-                DisplayName = 'DNS'
-                Direction = 'Inbound'
-                Protocol = 'UDP'
-                LocalPort = 53
-                Enabled = $true
-            },
-            @{
-                DisplayName = 'DNS'
-                Direction = 'Inbound'
-                Protocol = 'TCP'
-                LocalPort = 53
-                Enabled = $true
-            },
-            @{
-                DisplayName = 'Kerberos'
-                Direction = 'Inbound'
-                Protocol = 'UDP'
-                LocalPort = 88
-                Enabled = $true
-            },
-            @{
-                DisplayName = 'Kerberos'
-                Direction = 'Inbound'
-                Protocol = 'TCP'
-                LocalPort = 88
-                Enabled = $true
-            }
-        ))
-    } else {
+                @{
+                    DisplayName = 'DNS'
+                    Direction   = 'Inbound'
+                    Protocol    = 'UDP'
+                    LocalPort   = 53
+                    Enabled     = $true
+                },
+                @{
+                    DisplayName = 'DNS'
+                    Direction   = 'Inbound'
+                    Protocol    = 'TCP'
+                    LocalPort   = 53
+                    Enabled     = $true
+                },
+                @{
+                    DisplayName = 'Kerberos'
+                    Direction   = 'Inbound'
+                    Protocol    = 'UDP'
+                    LocalPort   = 88
+                    Enabled     = $true
+                },
+                @{
+                    DisplayName = 'Kerberos'
+                    Direction   = 'Inbound'
+                    Protocol    = 'TCP'
+                    LocalPort   = 88
+                    Enabled     = $true
+                }
+            ))
+    }
+    else {
         $ruleList.Add(@(
-            @{
-                DisplayName = 'SMB'
-                Direction = 'Inbound'
-                Protocol = 'TCP'
-                LocalPort = 445
-                Enabled = $true
-            },
-            @{
-                DisplayName = 'NFS'
-                Direction = 'Inbound'
-                Protocol = 'TCP'
-                LocalPort = 2049
-                Enabled = $true
-            },
-            @{
-                DisplayName = 'SQL Server'
-                Direction = 'Inbound'
-                Protocol = 'TCP'
-                LocalPort = @(1433, 1434)
-                Enabled = $true
-            },
-            @{
-                DisplayName = 'iSCSI Target Server'
-                Direction = 'Inbound'
-                Protocol = 'TCP'
-                LocalPort = 3260
-                Enabled = $true
-            },
-            @{
-                DisplayName = 'TFTP Server'
-                Direction = 'Inbound'
-                Protocol = 'UDP'
-                LocalPort = 69
-                Enabled = $true
-            }
-        ))
+                @{
+                    DisplayName = 'SMB'
+                    Direction   = 'Inbound'
+                    Protocol    = 'TCP'
+                    LocalPort   = 445
+                    Enabled     = $true
+                },
+                @{
+                    DisplayName = 'NFS'
+                    Direction   = 'Inbound'
+                    Protocol    = 'TCP'
+                    LocalPort   = 2049
+                    Enabled     = $true
+                },
+                @{
+                    DisplayName = 'SQL Server'
+                    Direction   = 'Inbound'
+                    Protocol    = 'TCP'
+                    LocalPort   = @(1433, 1434)
+                    Enabled     = $true
+                },
+                @{
+                    DisplayName = 'iSCSI Target Server'
+                    Direction   = 'Inbound'
+                    Protocol    = 'TCP'
+                    LocalPort   = 3260
+                    Enabled     = $true
+                },
+                @{
+                    DisplayName = 'TFTP Server'
+                    Direction   = 'Inbound'
+                    Protocol    = 'UDP'
+                    LocalPort   = 69
+                    Enabled     = $true
+                }
+            ))
     }
 
     # Configure Windows Firewall
@@ -491,7 +507,7 @@ Function Set-RequiredFirewallRules {
             $ruleName = $rule.DisplayName
             $ruleExists = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
             if (-not $ruleExists) {
-                $params  = @{
+                $params = @{
                     DisplayName = $ruleName
                     Direction   = $rule.Direction
                     Protocol    = $rule.Protocol
@@ -539,7 +555,8 @@ Function Join-DomainIfNotJoined {
                 -Source $EventSource `
                 -EventLogName $EventLogName `
                 -EntryType Information
-        } else {
+        }
+        else {
             Write-EventLog -Message 'The computer is already joined to the domain.' `
                 -Source $EventSource `
                 -EventLogName $EventLogName `
@@ -548,7 +565,7 @@ Function Join-DomainIfNotJoined {
     }
     catch {
         Write-EventLog -Message $_.Exception.Message 
-            -Source $EventSource `
+        -Source $EventSource `
             -EventLogName $EventLogName `
             -EntryType Error
     }
@@ -613,17 +630,19 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $true 
 
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
-            Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell","DNS","NFS-Client")
-            Set-ADDomainServices -DomainName $DomainName `
-                -DomainNetBiosName $DomainNetbiosName `
-                -Credential $Credential
-        } else {
+            Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
                 -Credential $Credential
         }
-    } else {
-    # Install required Windows Features for Failover Cluster and File Server Setup
+        else {
+            Set-ADDomainServices -DomainName $DomainName `
+                -DomainNetBiosName $DomainNetbiosName `
+                -Credential $Credential
+        }
+    }
+    else {
+        # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
 
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
