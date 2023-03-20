@@ -26,6 +26,31 @@ Installs PowerShell 7 and necessary roles and features for either a domain contr
 powershell.exe .\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIp 192.168.0.1
 ```
 
+# Struction of the Script
+## Test-DcAvailability function:
+This function checks the availability of a domain controller by testing the network connection and Domain Name System (DNS) port. It takes a mandatory parameter $ServerIpAddress and performs the following tests:
+- Ping the domain controller using the Test-NetConnection cmdlet.
+- Check if the TCP connection to the DNS port (53) is reachable.
+- Check if the domain controller is available using the Get-ADDomainController cmdlet.
+- Depending on the test results, it writes relevant messages to the event log and returns either $true or $false.
+
+## Wait-DcAvailability function:
+This function repeatedly calls the Test-DcAvailability function until the domain controller becomes available or the specified timeout is reached. It takes the following parameters:
+- $ServerIpAddress (mandatory): the IP address of the domain controller.
+- $TimeoutInSeconds (optional, default 60): the maximum time to wait for the domain controller.
+- $IntervalInSeconds (optional, default 1): the interval between availability checks.
+The function returns $true if the domain controller becomes available within the specified timeout, and $false otherwise.
+
+## Join-DomainIfNotJoined function:
+This function joins the computer to a specified domain if it is not already a member of the domain. It takes the following parameters:
+- $DomainName (mandatory): the name of the domain to join.
+- $DomainServerIpAddress (mandatory): the IP address of the domain controller.
+- $Credential (mandatory): the credential to use when joining the domain.
+- $Reboot (optional, default $true): whether to reboot the computer after joining the domain.
+The function sets the DNS server address, checks if the computer is already a member of the domain, and joins the domain if necessary. It also writes relevant messages to the event log.
+
+At the end of the script, the Wait-DcAvailability function is called with a 20-minute timeout and 5-second intervals. If the domain controller is available, the Join-DomainIfNotJoined function is called to join the computer to the domain.
+
 # Notes
 - This script requires elevated privileges to run, i.e., as an administrator.
 - The VmRole parameter must be one of the following: domain, domaincontroller, or dc for a domain controller; anything else for a node.
