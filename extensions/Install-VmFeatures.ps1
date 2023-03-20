@@ -648,8 +648,8 @@ try {
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
 
         $ready = Wait-DCAvailability -ServerIpAddress $DomainServerIpAddress `
-            -TimeoutInSeconds 600 `
-            -IntervalInSeconds 10
+            -TimeoutInSeconds 1200 `
+            -IntervalInSeconds 5
 
         if ($ready) {
             Join-DomainIfNotJoined -DomainName $DomainName `
