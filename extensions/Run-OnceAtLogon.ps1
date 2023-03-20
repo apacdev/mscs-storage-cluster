@@ -5,5 +5,5 @@ param (
         [string] $AdDomainName
 )
 
-Write-Host $SeverList
+Write-Output $SeverList
 Write-Host $DomainName
