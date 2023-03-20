@@ -38,5 +38,5 @@ $list = Write-Host [System.Text.Encoding]::Unicode.GetString([Convert]::FromBase
 $name = Write-Host [System.Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('$ADDomainName'))
 
 Write-Output $name
-Write-EventLog -Message $_.Exception.Message -Source $EventSource -EventLogName $EventLogName -EntryType Error
+Write-EventLog -Message $name -Source $EventSource -EventLogName $EventLogName -EntryType Information
 
