@@ -26,7 +26,7 @@ Installs PowerShell 7 and necessary roles and features for either a domain contr
 powershell.exe .\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPass P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIp 192.168.0.1
 ```
 
-# Struction of the Script
+# Structure of the Custom Script Extension
 ## Test-DcAvailability function:
 This function checks the availability of a domain controller by testing the network connection and Domain Name System (DNS) port. It takes a mandatory parameter $ServerIpAddress and performs the following tests:
 - Ping the domain controller using the Test-NetConnection cmdlet.
