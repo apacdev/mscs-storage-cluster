@@ -22,10 +22,13 @@ patrick.shim@live.co.kr (Patrick Shim)
 1.0.0.3
 
 .SYNOPSIS
-Installs PowerShell 7 and necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. Logs events to the Windows event log and catches any exceptions that occur.
+Custom Script Extension to install applications and Windows Features on Windows VMs.
 
 .DESCRIPTION
-This script installs PowerShell 7 on a Windows machine if it's not already installed, and then installs the necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. The script logs events to the Windows event log using a custom event source, and catches and logs any exceptions that occur during the execution of the script.
+This script configures each VMs per the role of the VMs in a fully automated way. The script will install the following applications and Windows Features on the VMs: 
+Common - PowerShell 7 and Az Modules 
+Domain Controller - Active Directory Domain Services, DNS Server
+Node Servers - Failover Clustering, File Server Services such as NFS, SMB, and iSCSI
 
 .PARAMETER VmName
 Specifies the name of the virtual machine.
@@ -77,11 +80,11 @@ param(
     [string] $DomainServerIpAddress,
 
     [Parameter(Mandatory = $false)]
-    [hashtable] $VmIpMap = @{"mscswvm-01" = "172.16.0.100"
-                             "mscswvm-02" = "172.16.1.101"
-                             "mscswvm-03" = "172.16.1.102"}
+    [array] $ServerList = @(@("mscswvm-01", "172.16.0.100"), @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102"))
+
 )
 
+ 
 # Function to check if Az Modules are installed.
 Function Test-AzModulesInstalled {
     if (Get-Module -Name Az -ListAvailable) {
@@ -106,60 +109,6 @@ Function Test-WindowsFeatureInstalled {
     else { 
         return $true 
     }
-}
-
-# Function to check if Domain Controller is available
-Function Test-DcAvailability {
-    param (
-        [Parameter(Mandatory = $true)]
-        [String] $ServerIpAddress
-    )
-    
-    if ((Test-NetConnection -ComputerName $ServerIpAddress -InformationLevel Detailed -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).PingSucceeded) { 
-        Write-EventLog -Message "Domain Controller is reachable via ICMP." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-
-        if ((Test-NetConnection -ComputerName $ServerIpAddress -Port 53 -InformationLevel Detailed -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).TcpTestSucceeded) {
-            Write-EventLog -Message "TCP Ping to DNS is reachable." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-   
-            try {
-                Get-ADDomainController -Server $ServerIpAddress
-                Write-EventLog -Message "Domain Controller is available." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-                return $true
-            }
-            catch {
-                Write-EventLog -Message "Domain Controller is not available (Error: $($_.Exception.Message))" -Source $eventSource -EventLogName $eventLogName -EntryType Error
-                return $false
-            }
-        } else {
-            Write-EventLog -Message "TCP Ping to DNS is not reachable." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            return $false
-        }
-    }
-    else {
-        Write-EventLog -Message "Domain Controller is not reachable." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-        return $false
-    }
-}
-
-# Function to wait for Domain Controller availability
-Function Wait-DcAvailability {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $ServerIpAddress,
-        [int] $TimeoutInSeconds = 60,
-        [int] $IntervalInSeconds = 1
-    )
-    
-    $startTime = Get-Date
-    
-    while ((Get-Date) -lt ($startTime).AddSeconds($TimeoutInSeconds)) {
-            
-        if (Test-DcAvailability -ServerIpAddress $ServerIpAddress) { 
-            return $true
-        }
-        Start-Sleep -Seconds $IntervalInSeconds
-    }
-    return $false
 }
 
 # Function to install specified Windows Features.
@@ -524,56 +473,6 @@ Function Set-RequiredFirewallRules {
     }
 }
 
-# Function to check if the VM is already joined to the domain.
-Function Join-ADDomain {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $DomainName,
-        [Parameter(Mandatory = $true)]
-        [string] $DomainServerIpAddress,
-        [Parameter(Mandatory = $true)]
-        [pscredential] $Credential,
-        [Parameter(Mandatory = $false)]
-        [bool] $Reboot = $true
-    )
-
-    try {
-        $curruentDomain = Get-WmiObject -Class Win32_ComputerSystem `
-            -ComputerName localhost
-
-        if ($curruentDomain.Domain -ne $DomainName) {
-            Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) `
-                -ServerAddresses $DomainServerIpAddress
-
-            Write-EventLog -Message 'Joining the computer to the domain.' `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
-                -EntryType Information
-
-            Add-Computer -DomainName $DomainName `
-                -Credential $Credential `
-                -Restart:$Reboot
-
-            Write-EventLog -Message 'Joining the computer to the domain has completed.' `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
-                -EntryType Information
-        }
-        else {
-            Write-EventLog -Message 'The computer is already joined to the domain.' `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
-                -EntryType Information
-        }
-    }
-    catch {
-        Write-EventLog -Message $_.Exception.Message 
-        -Source $eventSource `
-            -EventLogName $eventLogName `
-            -EntryType Error
-    }
-}
-
 # Function to simplify the creation of an event log entry.
 Function Write-EventLog {
     param(
@@ -596,13 +495,12 @@ Function Write-EventLog {
 }
 
 # Function to register schduled task on ad domain server to remote into the VMs to run domain join commands
-Function Set-FirstLogonTask
-{
+Function Set-FirstLogonTask {
     param (
         [Parameter(Mandatory = $false)]
         [string] $RemoteScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1$randomQueryString",
         [Parameter(Mandatory = $true)]
-        [hashtable] $ServerList,
+        [Object] $ServerList,
         [Parameter(Mandatory = $true)]
         [string] $DomainName,
         [Parameter(Mandatory = $true)]
@@ -621,7 +519,6 @@ Function Set-FirstLogonTask
     $task.Description = "A task that runs a PowerShell script at logon and deletes itself after successful execution."
     $task | Set-ScheduledTask
 }
-
 
 ############################################################################################################
 # Variable Definitions
@@ -659,10 +556,10 @@ try {
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
-        
+
         Set-RequiredFirewallRules -IsActiveDirectory $true 
-        
-        Set-FirstLogonTask -ServerList $ServerList -DomainName $DomainName -Credential $credential -DomainServerIpAddress $DomainServerIpAddress
+        Set-FirstLogonTask -RemoteScriptUrl $remoteScriptUrl -ServerList $ServerList -DomainName $DomainName -DomainServerIpAddress $DomainServerIpAddress -Credential $credential
+
         
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")

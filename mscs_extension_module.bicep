@@ -38,14 +38,22 @@ resource vm_01_resource 'Microsoft.Compute/virtualMachines@2022-11-01' existing 
   name: vm_03_name
  }
 
- // define an array of key-pair of VMs and its IP addresses
-  var vm_ip_map = {
-    vm_01_name: iipv4_01_address
-    vm_02_name: iipv4_02_address
-    vm_03_name: iipv4_03_address
-  }
- 
+ // define array variable for vm ip map
+var vm_ip_map = [
+    {
+      vmName: vm_01_name
+      vmIp: iipv4_01_address
+    }
+    {
+      vmName: vm_02_name
+      vmIp: iipv4_02_address
+    }
+    {
+      vmName: vm_03_name
+      vmIp: iipv4_03_address
+}]
 
+ 
 resource vm_01_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
   parent: vm_01_resource
   name: 'cse_dc_extension'
