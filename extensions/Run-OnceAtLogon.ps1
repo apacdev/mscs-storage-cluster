@@ -34,9 +34,6 @@ if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
     [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
 }
 
-$list = Write-Host [System.Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('$ServerList'))
-$name = Write-Host [System.Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('$ADDomainName'))
-
-Write-Output $name
-Write-EventLog -Message $name -Source $EventSource -EventLogName $EventLogName -EntryType Information
+Write-Output $ServerList
+Write-EventLog -Message $ADDomainName -Source $EventSource -EventLogName $EventLogName -EntryType Information
 
