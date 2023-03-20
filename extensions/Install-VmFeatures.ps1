@@ -26,9 +26,12 @@ Custom Script Extension to install applications and Windows Features on Windows 
 
 .DESCRIPTION
 This script configures each VMs per the role of the VMs in a fully automated way. The script will install the following applications and Windows Features on the VMs: 
-Common - PowerShell 7 and Az Modules 
-Domain Controller - Active Directory Domain Services, DNS Server
-Node Servers - Failover Clustering, File Server Services such as NFS, SMB, and iSCSI
+a. Common - PowerShell 7 and Az Modules 
+b. 1 x AD Domain Controller - Active Directory Domain Services, DNS Server
+c. 2 x Node Servers - Failover Clustering, File Server Services such as NFS, SMB, and iSCSI
+
+.PARAMETER ServerList
+An array that contains the VM names and IP addresses. It is passed as a parameter to the remote script.
 
 .PARAMETER VmName
 Specifies the name of the virtual machine.
@@ -39,7 +42,7 @@ Specifies the role of the virtual machine (`domain`, `domaincontroller`, or `dc`
 .PARAMETER AdminName
 Specifies the name of the administrator account for the domain.
 
-.PARAMETER AdminPassword
+.PARAMETER AdminSecret
 Specifies the password for the administrator account.
 
 .PARAMETER DomainName
@@ -52,12 +55,14 @@ Specifies the NetBIOS name of the domain.
 Specifies the Private IP Address of the domain server.
 
 .EXAMPLE
-.\InstallRolesAndFeatures.ps1 -VmRole domaincontroller -AdminName Admin -AdminPassword P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
+.\InstallRolesAndFeatures.ps1 -ServerList @(@("server-01", "192.168.1.1")) -VmRole domaincontroller -AdminName Admin -AdminSecret P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
 
 .NOTES
+- This script is tested on Windows Server 2022 VMs.
 - This script requires elevated privileges to run, i.e., as an administrator.
+- The `ServerList` parameter has default values for testing purposes.
 - The `VmRole` parameter must be one of the following: `domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node.
-- The `AdminName` and `AdminPassword` parameters must specify the name and password of an administrator account for the domain.
+- The `AdminName` and `-AdminSecret` parameters must specify the name and password of an administrator account for the domain.
 #>
 
 param(
@@ -68,7 +73,7 @@ param(
     [string] $AdminName,
         
     [Parameter(Mandatory = $true)]
-    [string] $AdminPassword,
+    [string] $AdminSecret,
         
     [Parameter(Mandatory = $true)]
     [string] $DomainName,
@@ -84,16 +89,29 @@ param(
 
 )
 
- 
-# Function to check if Az Modules are installed.
-Function Test-AzModulesInstalled {
-    if (Get-Module -Name Az -ListAvailable) {
-        return $true
-    }
-    else {
-        return $false
-    }
+############################################################################################################
+# Variable Definitions
+############################################################################################################
+
+$tempPath = "C:\\Temp"
+$msi = "PowerShell-7.3.2-win-x64.msi"
+$msiPath = "$tempPath\\$msi"
+$powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
+$timeZone = "Singapore Standard Time"
+$credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -AsPlainText -Force))
+$eventSource = "CustomScriptEvent"
+$eventLogName = "Application"
+$randomQueryString = "?$(Get-Random)"
+$remoteScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1$randomQueryString"
+
+# Check whether the event source exists, and create it if it doesn't exist.
+if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
+    [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $eventLogName)
 }
+
+############################################################################################################
+# Function Definitions
+############################################################################################################
 
 # Function to check if the VM has the specified Windows Feature installed.  Returns true if the feature is installed, false otherwise.
 Function Test-WindowsFeatureInstalled {
@@ -509,10 +527,11 @@ Function Set-FirstLogonTask {
         [pscredential] $Credential
     )
 
-    $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $Credential.UserName
+    $taskName = "RunOnceAtLogon"
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $Credential.UserName
     $principal = New-ScheduledTaskPrincipal -UserId $Credential.UserName -RunLevel Highest
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"& {`$Script = [scriptblock]::Create((New-Object System.Net.WebClient).DownloadString('$RemoteScriptUrl')); Invoke-Command -ScriptBlock `$Script -ArgumentList '$ServerList', '$DomainName', '$DomainServerIpAddress', '$Credential'}`""
-    $settings  = New-ScheduledTaskSettingsSet -Compatibility Win8 -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+    $settings = New-ScheduledTaskSettingsSet -Compatibility Win8 -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
     Register-ScheduledTask -TaskName $taskName -Trigger $trigger -Principal $principal -Settings $settings -Action $action
     $task = Get-ScheduledTask -TaskName $taskName
     $task.Author = "Patrick Shim"
@@ -521,37 +540,16 @@ Function Set-FirstLogonTask {
 }
 
 ############################################################################################################
-# Variable Definitions
-############################################################################################################
-
-$tempPath = "C:\\Temp"
-$msi = "PowerShell-7.3.2-win-x64.msi"
-$msiPath = "$tempPath\\$msi"
-$powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
-$timeZone = "Singapore Standard Time"
-$credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPassword -AsPlainText -Force))
-$eventSource = "CustomScriptEvent"
-$eventLogName = "Application"
-$randomQueryString = "?$(Get-Random)"
-$remoteScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1$randomQueryString"
-
-# Check whether the event source exists, and create it if it doesn't exist.
-if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
-    [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $eventLogName)
-}
-
-############################################################################################################
 # Execution Body
 ############################################################################################################
 
-try {
-    Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-        -Source $eventSource `
-        -EventLogName $eventLogName `
-        -EntryType Information
-    
-    Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
+Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
+    -Source $eventSource `
+    -EventLogName $eventLogName `
+    -EntryType Information
 
+try {    
+    Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
 
     # Install required Windows Features for Domain Controller Setup
@@ -560,7 +558,6 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $true 
         Set-FirstLogonTask -RemoteScriptUrl $remoteScriptUrl -ServerList $ServerList -DomainName $DomainName -DomainServerIpAddress $DomainServerIpAddress -Credential $credential
 
-        
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
