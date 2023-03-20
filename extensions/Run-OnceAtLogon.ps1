@@ -2,7 +2,7 @@ param (
         [Parameter(Mandatory = $true)]
         [string] $ServerList,
         [Parameter(Mandatory = $true)]
-        [string] $DomainName
+        [string] $AdDomainName
 )
 
 Write-Host $SeverList
