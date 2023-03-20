@@ -2,7 +2,9 @@ param (
         [Parameter(Mandatory = $true)]
         [string] $ServerList,
         [Parameter(Mandatory = $true)]
-        [string] $DomainNameToJoin
+        [string] $DomainName,
+        [Parameter(Mandatory = $true)]
+        [string] $AdminName   
 )
 
 Function Write-EventLog {
@@ -34,6 +36,9 @@ if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
     [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
 }
 
-Write-Output $ServerList
-Write-EventLog -Message $DomainNameToJoin -Source $EventSource -EventLogName $EventLogName -EntryType Information
+Write-Host $AdminName
+Write-Host $DomainName
+Write-Host $ServerList
+
+Write-EventLog -Message "$ServerList $DomainName" -Source $EventSource -EventLogName $EventLogName -EntryType Information
 
