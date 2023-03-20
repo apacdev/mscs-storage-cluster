@@ -3,18 +3,6 @@ targetScope = 'subscription'
 // Role: Azure Bicep Template for Microsoft Cluster Services (MSCS) on Windows Server 2022
 // Author:  Patrick Shim (patrick.shim@live.co.kr)
 // Copyright (C) 2023 by Microsoft Corporation
-// 
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ************************************************************************************************
 
 @description('Admin Username for the Virtual Machine and Ad Domain.')
@@ -23,20 +11,19 @@ param admin_name string = 'ContosoAdmin'
 @description('Admin Password for the Virtual Machine and Ad Domain.')
 @maxLength(18)
 @secure()
-param admin_password string = 'P@ssw0rd1234'
+param admin_password string
 
 @description('Name of the resource group to create.')
 @allowed([
   'mscs_compute_resources'
   'mscs_network_resources'
   'mscs_storage_resources'
-  'mscs_commons_resources'
+  'mscs_common_resources'
 ])
-
 param mscs_network_resources_name string = 'mscs_network_resources'
 param mscs_storage_resources_name string = 'mscs_storage_resources'
 param mscs_compute_resources_name string = 'mscs_compute_resources'
-param mscs_common_resources_name string  = 'mscs_commons_resources'
+param mscs_common_resources_name string  = 'mscs_common_resources'
 
 @description('Location for resources.')
 @allowed([
@@ -247,6 +234,7 @@ module vnet_resources 'mscs_network_module.bicep' = {
 // ************************************************************************************************
 // Bicep Module for Storage Resources
 // ************************************************************************************************
+
 module stroage_resources 'mscs_storage_module.bicep' = {
   name: 'mscs_storage_module'
   params: {

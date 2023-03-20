@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "admin_name": {
-      "value": "Admin"
+      "value": "pashim"
     },
     "mscs_network_resources_name": {
       "value": "mscs_network_resources"
@@ -15,7 +15,7 @@
       "value": "mscs_compute_resources"
     },
     "mscs_common_resources_name": {
-      "value": "mscs_common_resources"
+      "value": "mscs_commons_resources"
     },
     "location": {
       "value": "koreacentral"
@@ -27,7 +27,7 @@
       "value": "mscs-vms-automate"
     },
     "disk_name": {
-      "value": "mscs-csv-shared-disk"
+      "value": "mscs-asd-clusterdisk"
     },
     "vm_01_name": {
       "value": "mscswvm-01"
@@ -75,10 +75,10 @@
       "value": "fd00:db8:deca:deed::/64"
     },
     "domain_name": {
-      "value": "CONTOSO.ORG"
+      "value": "neostation.org"
     },
     "domain_netbios_name": {
-      "value": "CONTOSO"
+      "value": "NEOSTATION"
     },
     "domain_server_ip": {
       "value": "172.16.0.100"
@@ -129,7 +129,7 @@
       "value": "Standard_F4s_v2"
     },
     "storage_account_name": {
-      "value": "mscscommonstoragespace"
+      "value": "mscskrcommonstoragespace"
     }
   }
 }
