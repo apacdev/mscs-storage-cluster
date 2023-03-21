@@ -66,27 +66,14 @@ Specifies the Private IP Address of the domain server.
 #>
 
 param(
-    [Parameter(Mandatory = $true)]
-    [string] $VmRole,
-
-    [Parameter(Mandatory = $true)]
-    [string] $AdminName,
-        
-    [Parameter(Mandatory = $true)]
-    [string] $AdminSecret,
-        
-    [Parameter(Mandatory = $true)]
-    [string] $DomainName,
-        
-    [Parameter(Mandatory = $true)]
-    [string] $DomainNetBiosName,
-    
-    [Parameter(Mandatory = $true)]
-    [string] $DomainServerIpAddress,
-
-    [Parameter(Mandatory = $false)]
-    [array] $ServerList = @(@("mscswvm-01", "172.16.0.100"), @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102"))
-
+    [Parameter(Mandatory = $true)] [string] $ResourceGroupName,
+    [Parameter(Mandatory = $true)] [string] $VmRole,
+    [Parameter(Mandatory = $true)] [string] $AdminName,
+    [Parameter(Mandatory = $true)] [string] $AdminSecret,
+    [Parameter(Mandatory = $true)] [string] $DomainName,
+    [Parameter(Mandatory = $true)] [string] $DomainNetBiosName,
+    [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
+    [Parameter(Mandatory = $true)] [array]  $ServerList
 )
 
 ############################################################################################################
@@ -101,8 +88,8 @@ $timeZone = "Singapore Standard Time"
 $credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -AsPlainText -Force))
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
-$randomQueryString = "?$(Get-Random)"
-$remoteScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1$randomQueryString"
+
+# $ServerList = @(@("mscswvm-01", "172.16.0.100"), @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102"))
 
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
@@ -515,26 +502,24 @@ Function Write-EventLog {
 # Function to register schduled task on ad domain server to remote into the VMs to run domain join commands
 Function Set-FirstLogonTask {
     param (
-        [Parameter(Mandatory = $false)]
-        [string] $RemoteScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1$randomQueryString",
-        [Parameter(Mandatory = $true)]
-        [Object] $ServerList,
-        [Parameter(Mandatory = $true)]
-        [string] $DomainName,
-        [Parameter(Mandatory = $true)]
-        [string] $DomainServerIpAddress,
-        [Parameter(Mandatory = $true)]
-        [pscredential] $Credential
+        [Parameter(Mandatory = $true)] [string] $ResourceGroupName,
+        [Parameter(Mandatory = $true)] [string] $RemoteScriptUrl,
+        [Parameter(Mandatory = $true)] [array] $ServerList,
+        [Parameter(Mandatory = $true)] [string] $DomainName,
+        [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
+        [Parameter(Mandatory = $true)] [string] $AdminName,
+        [Parameter(Mandatory = $true)] [securestring] $AdminSecret
     )
 
-    $taskName = "RunOnceAtLogon"
-    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $Credential.UserName
-    $principal = New-ScheduledTaskPrincipal -UserId $Credential.UserName -RunLevel Highest
-    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"& {`$Script = [scriptblock]::Create((New-Object System.Net.WebClient).DownloadString('$RemoteScriptUrl')); Invoke-Command -ScriptBlock `$Script -ArgumentList '$ServerList', '$DomainName', '$DomainServerIpAddress', '$Credential'}`""
+    $RemoteScriptUrl = $RemoteScriptUrl + "?$(Get-Random)"
+    $taskName = "runatlogon"
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $AdminName
+    $principal = New-ScheduledTaskPrincipal -UserId $AdminName -RunLevel Highest
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"& {`$Script = [scriptblock]::Create((New-Object System.Net.WebClient).DownloadString('$RemoteScriptUrl')); Invoke-Command -ScriptBlock `$Script -ArgumentList '$ResourceGroupName', '$ServerList', '$DomainName', '$DomainServerIpAddress', '$AdminName', '$AdminSecret'}`""
     $settings = New-ScheduledTaskSettingsSet -Compatibility Win8 -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
     Register-ScheduledTask -TaskName $taskName -Trigger $trigger -Principal $principal -Settings $settings -Action $action
     $task = Get-ScheduledTask -TaskName $taskName
-    $task.Author = "Patrick Shim"
+    $task.Author = "$AdminName"
     $task.Description = "A task that runs a PowerShell script at logon and deletes itself after successful execution."
     $task | Set-ScheduledTask
 }
@@ -554,9 +539,16 @@ try {
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
-
+        <#
+            [Parameters(Mandatory=$true)] [string]$ResourceGroupName,
+            [Parameters(Mandatory=$true)] [string]$ServerList,
+            [Parameters(Mandatory=$true)] [string]$DomainName,
+            [Parameters(Mandatory=$true)] [string]$DomainServerIpAddress,
+            [Parameters(Mandatory=$true)] [string]$AdminName,
+            [Parameters(Mandatory=$true)] [securestring]$AdminSecret
+        #>
         Set-RequiredFirewallRules -IsActiveDirectory $true 
-        Set-FirstLogonTask -RemoteScriptUrl $remoteScriptUrl -ServerList $ServerList -DomainName $DomainName -DomainServerIpAddress $DomainServerIpAddress -Credential $credential
+        Set-FirstLogonTask -RemoteScriptUrl "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1" -ResourceGroupName $ResourceGroupName -ServerList $ServerList -DomainName $DomainName -DomainServerIpAddress $DomainServerIpAddress -AdminName $AdminName -AdminSecret $AdminSecret
 
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")

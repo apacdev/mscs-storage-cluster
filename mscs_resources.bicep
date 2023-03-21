@@ -300,6 +300,7 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     domain_name: domain_name
     domain_netbios_name: domain_netbios_name
     domain_server_ip: domain_server_ip
+    resource_group_name: mscs_compute_resources_name
   }
   dependsOn: [
     compute_resources

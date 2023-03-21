@@ -26,6 +26,8 @@ param iipv4_01_address string
 param iipv4_02_address string
 param iipv4_03_address string
 
+param resource_group_name string
+
 resource vm_01_resource 'Microsoft.Compute/virtualMachines@2022-11-01' existing = {
   name: vm_01_name
  }
@@ -40,10 +42,10 @@ resource vm_01_resource 'Microsoft.Compute/virtualMachines@2022-11-01' existing 
 
  // define array variable for vm ip map
 var vm_ip_map = [
-    {
-      vmName: vm_01_name
-      vmIp: iipv4_01_address
-    }
+//    {
+//      vmName: vm_01_name
+//      vmIp: iipv4_01_address
+//    }
     {
       vmName: vm_02_name
       vmIp: iipv4_02_address
@@ -65,7 +67,7 @@ resource vm_01_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
       fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
     }
     protectedSettings: {
-      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_01_role} -AdminName ${admin_name} -AdminSecret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -ServerList ${vm_ip_map}'
+      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -ResourceGroupName ${resource_group_name} -VmRole ${vm_01_role} -AdminName ${admin_name} -AdminSecret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -ServerList ${vm_ip_map}'
     }
   }
 }
@@ -83,7 +85,7 @@ resource vm_02_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
       fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
     }
     protectedSettings: {
-      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_02_role} -AdminName ${admin_name} -AdminSecret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -ServerList ${vm_ip_map}'
+      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -ResourceGroupName ${resource_group_name} -VmRole ${vm_02_role} -AdminName ${admin_name} -AdminSecret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -ServerList ${vm_ip_map}'
     }
   }
 }
@@ -101,7 +103,7 @@ resource vm_03_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
       fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
     }
     protectedSettings: {
-      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -VmRole ${vm_03_role} -AdminName ${admin_name} -AdminSecret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -ServerList ${vm_ip_map}'
+      commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -ResourceGroupName ${resource_group_name}  -VmRole ${vm_03_role} -AdminName ${admin_name} -AdminSecret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -ServerList ${vm_ip_map}'
     }
   }
 }
