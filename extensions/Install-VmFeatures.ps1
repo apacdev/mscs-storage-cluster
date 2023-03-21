@@ -536,6 +536,8 @@ Write-EventLog -Message "Starting installation of roles and features (timestamp:
 try {    
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
+    
+    $AdminSecret = ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
