@@ -532,13 +532,13 @@ Write-EventLog -Message "Starting installation of roles and features (timestamp:
     -Source $eventSource `
     -EventLogName $eventLogName `
     -EntryType Information
-
+    
 try {    
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
-    
-    $AdminSecret = ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
 
+    $SecuredAdminSecret =  ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
+    
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
         <#
@@ -550,7 +550,8 @@ try {
             [Parameters(Mandatory=$true)] [securestring]$AdminSecret
         #>
         Set-RequiredFirewallRules -IsActiveDirectory $true 
-        Set-FirstLogonTask -RemoteScriptUrl "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1" -ResourceGroupName $ResourceGroupName -ServerList $ServerList -DomainName $DomainName -DomainServerIpAddress $DomainServerIpAddress -AdminName $AdminName -AdminSecret $AdminSecret
+        
+        Set-FirstLogonTask -RemoteScriptUrl "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1" -ResourceGroupName $ResourceGroupName -ServerList $ServerList -DomainName $DomainName -DomainServerIpAddress $DomainServerIpAddress -AdminName $AdminName -AdminSecret $SecuredAdminSecret
 
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
