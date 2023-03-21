@@ -15,5 +15,3 @@ This Bicep template deploys a multi-server cluster on Microsoft Azure. The deplo
 az login
 az deployment group create --resource-group <BaseResourceGroupName> --template-file mscs_resources.bicep --parameters param1=value1 param2=value2 ... 
 ```
-
-# Parameters
