@@ -1,5 +1,5 @@
 # Install-VmFeatures.ps1
-The script is written in PowerShell 5 to configure a Windows Server 2022 environment from Azure deployment using Custom Script Extension. It installs PowerShell 7 and Az Modules on a Windows machine. The script also installs the necessary roles and features for either a Active Directory Domain Controller or a node in a Windows Failover Cluster. The script logs events to the Windows Event Log using a custom event source, and catches and logs any exceptions that occur during the execution of the script.
+The script is written in PowerShell 5 to configure a Windows Server 2022 environment from Azure deployment (Custom Script Extension). It installs PowerShell 7 and Az Modules on a Windows machine. The script also installs the necessary roles and features for either a Active Directory Domain Controller or a node in a Windows Failover Cluster. The script logs events to the Windows Event Log using a custom event source, and catches and logs any exceptions that occur during the execution of the script.
 
 ## License
 Copyright (c) Microsoft Corporation. All rights reserved.
@@ -14,6 +14,7 @@ patrick.shim@live.co.kr (Patrick Shim)
 Installs PowerShell 7 and necessary roles and features for either a domain controller or a node in a Windows Failover Cluster. Logs events to the Windows event log and catches any exceptions that occur.
 
 # Parameters
+- ResrourceGroupName: Specifies a Azure Resource Group for it to register cluster node VMs
 - VmRole: Specifies the role of the virtual machine (domain, domaincontroller, or dc for a domain controller; anything else for a node).
 - AdminName: Specifies the name of the administrator account for the domain.
 - AdminPass: Specifies the password for the administrator account.
