@@ -14,3 +14,4 @@ Add-Computer -DomainName $DomainName `
     -Force
     
 Write-Host "hello world"
+Start-Sleep -Seconds 30
