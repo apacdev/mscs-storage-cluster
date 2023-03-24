@@ -12,7 +12,7 @@ $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster
 
 $command = @"
     Invoke-WebRequest -Uri $scriptUrl -OutFile $scriptName
-    .\Add-NodeVMsToDomain.ps1 -DomainName '$DomainName' -DomainServerIpAddress '$DomainServerIpAddress' -AdminName '$AdminName' -AdminSecret '$AdminSecret'
+    .\Add-NodeVMsToDomain.ps1 -ResourceGroupName $ResourceGroupName -DomainName '$DomainName' -DomainServerIpAddress '$DomainServerIpAddress' -AdminName '$AdminName' -AdminSecret '$AdminSecret'
 "@
 
 if ($null -eq (Get-AzContext)) {
