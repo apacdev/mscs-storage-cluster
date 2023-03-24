@@ -12,3 +12,5 @@ Add-Computer -DomainName $DomainName `
     -Credential (New-Object System.Management.Automation.PSCredential($AdminUser, $AdminSecret)) `
     -Restart `
     -Force
+    
+Write-Host "hello world"
