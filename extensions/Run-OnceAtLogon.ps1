@@ -31,3 +31,5 @@ if ($ServerList.Count -gt 0) {
             -Script $command
     }
 }
+
+Write-Host "Execution completed"
