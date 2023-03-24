@@ -33,3 +33,4 @@ if ($ServerList.Count -gt 0) {
 }
 
 Write-Host "Execution completed"
+Start-Sleep -Seconds 30
