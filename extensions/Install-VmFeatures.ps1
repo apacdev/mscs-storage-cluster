@@ -88,9 +88,7 @@ $timeZone = "Singapore Standard Time"
 $credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -AsPlainText -Force))
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
-
 # $ServerList = @(@("mscswvm-01", "172.16.0.100"), @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102"))
-
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
     [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $eventLogName)
@@ -499,29 +497,44 @@ Function Write-EventLog {
     $log.WriteEntry($Message, $EntryType)
 }
 
-# Function to register schduled task on ad domain server to remote into the VMs to run domain join commands
-Function Set-FirstLogonTask {
+Function Join-Domain {
     param (
-        [Parameter(Mandatory = $true)] [string] $ResourceGroupName,
-        [Parameter(Mandatory = $true)] [string] $RemoteScriptUrl,
-        [Parameter(Mandatory = $true)] [array] $ServerList,
-        [Parameter(Mandatory = $true)] [string] $DomainName,
-        [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
-        [Parameter(Mandatory = $true)] [string] $AdminName,
-        [Parameter(Mandatory = $true)] [securestring] $AdminSecret
+        [Parameter(Mandatory=$true)] [string] $DomainName,
+        [Parameter(Mandatory=$true)] [string] $DomainServerIpAddress,
+        [Parameter(Mandatory=$true)] [string] $AdminName,
+        [Parameter(Mandatory=$true)] [securestring] $AdminSecret,
+        [Parameter()] [int] $MaxRetries = 10,
+        [Parameter()] [int] $RetryIntervalSeconds = 30
     )
+    
+    Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
 
-    $RemoteScriptUrl = $RemoteScriptUrl + "?$(Get-Random)"
-    $taskName = "runatlogon"
-    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $AdminName
-    $principal = New-ScheduledTaskPrincipal -UserId $AdminName -RunLevel Highest
-    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command `"& {`$Script = [scriptblock]::Create((New-Object System.Net.WebClient).DownloadString('$RemoteScriptUrl')); Invoke-Command -ScriptBlock `$Script -ArgumentList '$ResourceGroupName', '$ServerList', '$DomainName', '$DomainServerIpAddress', '$AdminName', '$AdminSecret'}`""
-    $settings = New-ScheduledTaskSettingsSet -Compatibility Win8 -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
-    Register-ScheduledTask -TaskName $taskName -Trigger $trigger -Principal $principal -Settings $settings -Action $action
-    $task = Get-ScheduledTask -TaskName $taskName
-    $task.Author = "$AdminName"
-    $task.Description = "A task that runs a PowerShell script at logon and deletes itself after successful execution."
-    $task | Set-ScheduledTask
+    # Join domain
+    Write-EventLog -Message "Setting DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
+    Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
+    $credential = (New-Object System.Management.Automation.PSCredential('pashim', (ConvertTo-SecureString -String 'Roman@2013!2015' -asPlainText -Force)))
+                
+    $retries = 0
+    
+    # Wait for network connectivity to the domain server
+    while ($retries -lt $MaxRetries) {
+        if ((Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
+            Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            
+            # Check if the domain controller is ready to accept a computer join
+            Add-Computer -DomainName $DomainName `
+                    -Credential $credential `
+                    -Restart `
+                    -Force
+
+            Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            return
+        }
+        $retries++
+        Write-EventLog -Message "Unable to join domain. Retrying in $RetryIntervalSeconds seconds..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+        Start-Sleep -Seconds $RetryIntervalSeconds
+    }
+    Write-EventLog -Message "Failed to join domain after $MaxRetries retries." -Source $eventSource -EventLogName $eventLogName -EntryType Error
 }
 
 ############################################################################################################
@@ -532,27 +545,18 @@ Write-EventLog -Message "Starting installation of roles and features (timestamp:
     -Source $eventSource `
     -EventLogName $eventLogName `
     -EntryType Information
-    
+
 try {    
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
-
-    $SecuredAdminSecret =  ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
     
+    $AdminSecret = ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
+
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
-        <#
-            [Parameters(Mandatory=$true)] [string]$ResourceGroupName,
-            [Parameters(Mandatory=$true)] [string]$ServerList,
-            [Parameters(Mandatory=$true)] [string]$DomainName,
-            [Parameters(Mandatory=$true)] [string]$DomainServerIpAddress,
-            [Parameters(Mandatory=$true)] [string]$AdminName,
-            [Parameters(Mandatory=$true)] [securestring]$AdminSecret
-        #>
+
         Set-RequiredFirewallRules -IsActiveDirectory $true 
         
-        Set-FirstLogonTask -RemoteScriptUrl "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Run-OnceAtLogon.ps1" -ResourceGroupName $ResourceGroupName -ServerList $ServerList -DomainName $DomainName -DomainServerIpAddress $DomainServerIpAddress -AdminName $AdminName -AdminSecret $SecuredAdminSecret
-
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
             Set-ADDomainServices -DomainName $DomainName `
@@ -569,6 +573,12 @@ try {
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
+        Join-Domain -DomainName $DomainName `
+            -DomainServerIpAddress $DomainServerIpAddress `
+            -AdminName $AdminName `
+            -AdminSecret $AdminSecret `
+            -MaxRetries 15 `
+            -RetryIntervalSeconds 30
     }
 }
 catch {
