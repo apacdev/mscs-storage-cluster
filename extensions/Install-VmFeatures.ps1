@@ -205,9 +205,11 @@ Function Install-PowerShellWithAzModules {
             -EventLogName $eventLogName `
             -EntryType Information
 
+        # Ensure the Az module is installed
         if (-not (Get-Module -Name Az -ListAvailable -ErrorAction SilentlyContinue)) { 
             Install-Module -Name Az `
                 -Force `
+                --AllowClobber `
                 -Scope AllUsers `
                 -ErrorAction SilentlyContinue 
         }
@@ -223,7 +225,6 @@ Function Install-PowerShellWithAzModules {
                 -Force `
                 -ErrorAction SilentlyContinue 
         }
-
     }
     catch {
         Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" `
@@ -512,7 +513,7 @@ Function Join-Domain {
     # Join domain
     Write-EventLog -Message "Setting DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
     Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
-    $credential = (New-Object System.Management.Automation.PSCredential('pashim', (ConvertTo-SecureString -String 'Roman@2013!2015' -asPlainText -Force)))
+    $credential = (New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -asPlainText -Force)))
                 
     $retries = 0
     
