@@ -164,6 +164,7 @@ Function Install-PowerShellWithAzModules {
         [Parameter(Mandatory = $true)]
         [string] $MsiPath
     )
+    
     try {
         # check if a temp directory for a download exists. if not, create it.
         if (-not (Test-Path -Path $tempPath)) { 
