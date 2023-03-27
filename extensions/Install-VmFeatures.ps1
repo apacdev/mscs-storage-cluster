@@ -578,8 +578,8 @@ try {
         Join-Domain -DomainName $DomainName `
             -DomainServerIpAddress $DomainServerIpAddress `
             -Credential $credential `
-            -MaxRetries 15 `
-            -RetryIntervalSeconds 30
+            -MaxRetries 30 `
+            -RetryIntervalSeconds 10
     }
 }
 catch {
