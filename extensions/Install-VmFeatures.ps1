@@ -68,6 +68,7 @@ Specifies the Private IP Address of the domain server.
 param(
     [Parameter(Mandatory = $true)] [string] $ResourceGroupName,
     [Parameter(Mandatory = $true)] [string] $VmRole,
+    [Parameter(Mandatory = $true)] [string] $VmName,
     [Parameter(Mandatory = $true)] [string] $AdminName,
     [Parameter(Mandatory = $true)] [securestring] $AdminSecret,
     [Parameter(Mandatory = $true)] [string] $DomainName,
