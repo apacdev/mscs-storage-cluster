@@ -69,7 +69,7 @@ param(
     [Parameter(Mandatory = $true)] [string] $ResourceGroupName,
     [Parameter(Mandatory = $true)] [string] $VmRole,
     [Parameter(Mandatory = $true)] [string] $AdminName,
-    [Parameter(Mandatory = $true)] [string] $AdminSecret,
+    [Parameter(Mandatory = $true)] [securestring] $AdminSecret,
     [Parameter(Mandatory = $true)] [string] $DomainName,
     [Parameter(Mandatory = $true)] [string] $DomainNetBiosName,
     [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
@@ -85,7 +85,8 @@ $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
 $powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -AsPlainText -Force))
+# $credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -AsPlainText -Force))
+$credential = New-Object System.Management.Automation.PSCredential($AdminName, $AdminSecret)
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
 # $ServerList = @(@("mscswvm-01", "172.16.0.100"), @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102"))
@@ -210,7 +211,7 @@ Function Install-PowerShellWithAzModules {
         if (-not (Get-Module -Name Az -ListAvailable -ErrorAction SilentlyContinue)) { 
             Install-Module -Name Az `
                 -Force `
-                --AllowClobber `
+                -AllowClobber `
                 -Scope AllUsers `
                 -ErrorAction SilentlyContinue 
         }
@@ -503,8 +504,7 @@ Function Join-Domain {
     param (
         [Parameter(Mandatory=$true)] [string] $DomainName,
         [Parameter(Mandatory=$true)] [string] $DomainServerIpAddress,
-        [Parameter(Mandatory=$true)] [string] $AdminName,
-        [Parameter(Mandatory=$true)] [securestring] $AdminSecret,
+        [Parameter(Mandatory=$true)] [pscredential] $Credential,
         [Parameter()] [int] $MaxRetries = 10,
         [Parameter()] [int] $RetryIntervalSeconds = 30
     )
@@ -514,7 +514,6 @@ Function Join-Domain {
     # Join domain
     Write-EventLog -Message "Setting DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
     Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
-    $credential = (New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -asPlainText -Force)))
                 
     $retries = 0
     
@@ -525,7 +524,7 @@ Function Join-Domain {
             
             # Check if the domain controller is ready to accept a computer join
             Add-Computer -DomainName $DomainName `
-                    -Credential $credential `
+                    -Credential $Credential `
                     -Restart `
                     -Force
 
@@ -552,7 +551,7 @@ try {
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
-    $AdminSecret = ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
+  #  $AdminSecret = ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
@@ -577,8 +576,7 @@ try {
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
         Join-Domain -DomainName $DomainName `
             -DomainServerIpAddress $DomainServerIpAddress `
-            -AdminName $AdminName `
-            -AdminSecret $AdminSecret `
+            -Credential $credential `
             -MaxRetries 15 `
             -RetryIntervalSeconds 30
     }
