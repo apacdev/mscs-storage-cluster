@@ -558,13 +558,18 @@ Function Join-Domain {
             # Set DNS server to the domain controller
             Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
             Write-EventLog -Message "Set DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-                
+            Write-EventLog -Message "Sleeping for some minutes..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            
+            Start-Sleep -Seconds 180
+            Write-EventLog -Message "Woke up to join the domain..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            
             # Join domain
             Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
             Add-Computer -DomainName $DomainName `
                 -Credential $Credential `
                 -Restart `
                 -Force
+                
             Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             break
         }
