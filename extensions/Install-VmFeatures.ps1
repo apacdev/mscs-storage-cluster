@@ -42,7 +42,7 @@ Specifies the role of the virtual machine (`domain`, `domaincontroller`, or `dc`
 .PARAMETER AdminName
 Specifies the name of the administrator account for the domain.
 
-.PARAMETER AdminSecret
+.PARAMETER Secret
 Specifies the password for the administrator account.
 
 .PARAMETER DomainName
@@ -55,14 +55,14 @@ Specifies the NetBIOS name of the domain.
 Specifies the Private IP Address of the domain server.
 
 .EXAMPLE
-.\InstallRolesAndFeatures.ps1 -ServerList @(@("server-01", "192.168.1.1")) -VmRole domaincontroller -AdminName Admin -AdminSecret P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
+.\InstallRolesAndFeatures.ps1 -ServerList @(@("server-01", "192.168.1.1")) -VmRole domaincontroller -AdminName Admin -adminSecret P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
 
 .NOTES
 - This script is tested on Windows Server 2022 VMs.
 - This script requires elevated privileges to run, i.e., as an administrator.
 - The `ServerList` parameter has default values for testing purposes.
 - The `VmRole` parameter must be one of the following: `domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node.
-- The `AdminName` and `-AdminSecret` parameters must specify the name and password of an administrator account for the domain.
+- The `AdminName` and `-adminSecret` parameters must specify the name and password of an administrator account for the domain.
 #>
 
 param(
@@ -70,7 +70,7 @@ param(
     [Parameter(Mandatory = $true)] [string] $VmRole,
     [Parameter(Mandatory = $true)] [string] $VmName,
     [Parameter(Mandatory = $true)] [string] $AdminName,
-    [Parameter(Mandatory = $true)] [securestring] $AdminSecret,
+    [Parameter(Mandatory = $true)] [string] $Secret,
     [Parameter(Mandatory = $true)] [string] $DomainName,
     [Parameter(Mandatory = $true)] [string] $DomainNetBiosName,
     [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
@@ -86,8 +86,8 @@ $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
 $powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminSecret -AsPlainText -Force))
-# $credential = New-Object System.Management.Automation.PSCredential($AdminName, $AdminSecret)
+$adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
+$credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
 # $ServerList = @(@("mscswvm-01", "172.16.0.100"), @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102"))
@@ -539,6 +539,21 @@ Function Join-Domain {
     Write-EventLog -Message "Failed to join domain after $MaxRetries retries." -Source $eventSource -EventLogName $eventLogName -EntryType Error
 }
 
+Function Set-MSClusteringService { 
+            
+    New-Cluster -Name $ClusterName `
+        -Node $env:computername `
+        -StaticAddress $ClusterIp `
+        -NoStorage `
+        -Force
+
+    Add-ClusterNode -Cluster $ClusterName `
+        -Node $env:computername `
+        -NodeCredential $credential `
+        -Force
+
+}
+
 ############################################################################################################
 # Execution Body
 ############################################################################################################
@@ -552,7 +567,7 @@ try {
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
-  #  $AdminSecret = ConvertTo-SecureString -String $AdminSecret -Force -AsPlainText
+  #  $adminSecret = ConvertTo-SecureString -String $adminSecret -Force -AsPlainText
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
@@ -572,14 +587,20 @@ try {
         }
     }
     else {
+        # if the length of serverList is greater than or equalt to 1 and the VM name matches with first server in the list, then it is the primary node in the cluster.
+        if ($serverList.Count -ge 1 -and $serverList[0] -eq $env:computername) {
+
+ 
+        }
+
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
         Join-Domain -DomainName $DomainName `
             -DomainServerIpAddress $DomainServerIpAddress `
             -Credential $credential `
-            -MaxRetries 30 `
-            -RetryIntervalSeconds 10
+            -MaxRetries 15 `
+            -RetryIntervalSeconds 30
     }
 }
 catch {
