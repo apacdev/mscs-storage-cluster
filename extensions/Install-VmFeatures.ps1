@@ -90,7 +90,6 @@ $adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
-# $ServerList = @(@("mscswvm-01", "172.16.0.100"), @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102"))
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
     [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $eventLogName)
@@ -507,7 +506,7 @@ Function Join-Domain {
         [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
         [Parameter(Mandatory = $true)] [pscredential] $Credential,
         [Parameter()] [int] $MaxRetries = 10,
-        [Parameter()] [int] $RetryIntervalSeconds = 30
+        [Parameter()] [int] $RetryIntervalSeconds = 5
     )
     
     Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
@@ -521,33 +520,26 @@ Function Join-Domain {
     while ($retries -lt $MaxRetries) {
         if ((Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
             Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-
-            try {
-                # Set DNS server to the domain controller
-                Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
-                Write-EventLog -Message "Set DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            # Set DNS server to the domain controller
+            Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
+            Write-EventLog -Message "Set DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
                 
-                # Join domain
-                Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-                Add-Computer -DomainName $DomainName `
-                    -Credential $Credential `
-                    -Restart `
-                    -Force
-                Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            }
-            catch {
-                Write-EventLog -Message "Failed to join domain $DomainName. Error: $($_.Exception.Message)" -Source $eventSource -EventLogName $eventLogName -EntryType Error
-            }
-            
-            return
+            # Join domain
+            Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            Add-Computer -DomainName $DomainName `
+                -Credential $Credential `
+                -Restart `
+                -Force
+            Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            break
         }
-        $retries++
-        Write-EventLog -Message "Unable to join domain. Retrying in $RetryIntervalSeconds seconds..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-        Start-Sleep -Seconds $RetryIntervalSeconds
+        else {
+            Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress not established. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            Start-Sleep -Seconds $RetryIntervalSeconds
+            $retries++
+        }
     }
-    Write-EventLog -Message "Failed to join domain after $MaxRetries retries." -Source $eventSource -EventLogName $eventLogName -EntryType Error
 }
-
 Function Set-MSClusteringService { 
             
     New-Cluster -Name $ClusterName `
@@ -573,11 +565,10 @@ Write-EventLog -Message "Starting installation of roles and features (timestamp:
     -EntryType Information
 
 try {    
+
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
-    #  $adminSecret = ConvertTo-SecureString -String $adminSecret -Force -AsPlainText
-
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
 
@@ -596,25 +587,17 @@ try {
         }
     }
     else {
-        # if the length of serverList is greater than or equalt to 1 and the VM name matches with first server in the list, then it is the primary node in the cluster.
-        if ($serverList.Count -ge 1 -and $serverList[0] -eq $env:computername) {
-
- 
-        }
 
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
+        
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
+        
         Join-Domain -DomainName $DomainName `
             -DomainServerIpAddress $DomainServerIpAddress `
             -Credential $credential `
-            -MaxRetries 15 `
-            -RetryIntervalSeconds 30
+            -MaxRetries 12 `
+            -RetryIntervalSeconds 5
     }
 }
-catch {
-    Write-EventLog -Message $_.Exception.Message `
-        -Source $eventSource `
-        -EventLogName $eventLogName `
-        -EntryType Error
-}
+catch { Write-EventLog -Message $_.Exception.Message -Source $eventSource -EventLogName $eventLogName -EntryType Error }
