@@ -4,10 +4,10 @@ param(
   [Parameter(Mandatory=$true)]
   [string] $AdminName,
   [Parameter(Mandatory=$true)]
-  [ps] $Secret
+  [string] $Secret
 )
 
-$Credential = New-Object System.Management.Automation.PSCredential($AdminName, $Secret)
+$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $Secret -AsPlainText -Force))
 
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
