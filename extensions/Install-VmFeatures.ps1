@@ -503,9 +503,9 @@ Function Write-EventLog {
 
 Function Join-Domain {
     param (
-        [Parameter(Mandatory=$true)] [string] $DomainName,
-        [Parameter(Mandatory=$true)] [string] $DomainServerIpAddress,
-        [Parameter(Mandatory=$true)] [pscredential] $Credential,
+        [Parameter(Mandatory = $true)] [string] $DomainName,
+        [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
+        [Parameter(Mandatory = $true)] [pscredential] $Credential,
         [Parameter()] [int] $MaxRetries = 10,
         [Parameter()] [int] $RetryIntervalSeconds = 30
     )
@@ -514,7 +514,6 @@ Function Join-Domain {
 
     # Join domain
     Write-EventLog -Message "Setting DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-    Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
                 
     $retries = 0
     
@@ -522,14 +521,19 @@ Function Join-Domain {
     while ($retries -lt $MaxRetries) {
         if ((Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
             Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            
+
             try {
-            # Check if the domain controller is ready to accept a computer join
-            Add-Computer -DomainName $DomainName `
+                # Set DNS server to the domain controller
+                Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
+                Write-EventLog -Message "Set DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
+                
+                # Join domain
+                Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
+                Add-Computer -DomainName $DomainName `
                     -Credential $Credential `
                     -Restart `
                     -Force
-                    Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+                Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             }
             catch {
                 Write-EventLog -Message "Failed to join domain $DomainName. Error: $($_.Exception.Message)" -Source $eventSource -EventLogName $eventLogName -EntryType Error
@@ -572,7 +576,7 @@ try {
     Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
     Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
-  #  $adminSecret = ConvertTo-SecureString -String $adminSecret -Force -AsPlainText
+    #  $adminSecret = ConvertTo-SecureString -String $adminSecret -Force -AsPlainText
 
     # Install required Windows Features for Domain Controller Setup
     if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
