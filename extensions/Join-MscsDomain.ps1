@@ -9,4 +9,5 @@ Add-Computer -ComputerName $env:COMPUTERNAME `
     -LocalCredential $Credential `
     -DomainName $DomainName `
     -Credential $Credential `
+    -Restart `
     -Force
