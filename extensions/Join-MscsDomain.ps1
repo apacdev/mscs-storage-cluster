@@ -11,3 +11,4 @@ Add-Computer -ComputerName $env:COMPUTERNAME `
     -Credential $Credential `
     -Restart `
     -Force
+Write-Host "Joined the Domain '$DomainName'."
