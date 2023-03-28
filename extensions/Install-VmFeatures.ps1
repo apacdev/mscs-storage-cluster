@@ -548,7 +548,12 @@ Function Join-Domain {
     
     # Wait for network connectivity to the domain server
     while ($retries -lt $MaxRetries) {
-        if ((Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
+        if ( $true -ne (Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
+            Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress not established. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            Start-Sleep -Seconds $RetryIntervalSeconds
+            $retries++
+        }
+        else {
             Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             # Set DNS server to the domain controller
             Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
@@ -562,11 +567,6 @@ Function Join-Domain {
                 -Force
             Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             break
-        }
-        else {
-            Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress not established. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            Start-Sleep -Seconds $RetryIntervalSeconds
-            $retries++
         }
     }
 }
