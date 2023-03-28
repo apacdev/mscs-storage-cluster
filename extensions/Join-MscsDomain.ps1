@@ -2,12 +2,8 @@ param(
   [Parameter(Mandatory=$true)]
   [string] $DomainName,
   [Parameter(Mandatory=$true)]
-  [string] $AdminName,
-  [Parameter(Mandatory=$true)]
-  [string] $Secret
+  [pscredential] $Credential
 )
-
-$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $Secret -AsPlainText -Force))
 
 Add-Computer -ComputerName $env:COMPUTERNAME `
     -LocalCredential $Credential `
