@@ -196,10 +196,16 @@ Function Install-PowerShellWithAzModules {
         }
 
         # contuning to install the Az modules.
-        if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
+        if ($null -eq (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
             Install-PackageProvider -Name NuGet `
                 -Force `
                 -ErrorAction SilentlyContinue
+        }
+        else {
+            Write-EventLog -Message "NuGet Package Provider is found. Skipping the installation." `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
+                -EntryType Information
         }
         
         Write-EventLog -Message "Installing the Az module." `
@@ -208,18 +214,24 @@ Function Install-PowerShellWithAzModules {
             -EntryType Information
 
         # Ensure the Az module is installed
-        if (-not (Get-Module -Name Az -ListAvailable -ErrorAction SilentlyContinue)) { 
+        if ($null -eq (Get-Module -Name Az -ListAvailable -ErrorAction SilentlyContinue)) { 
             Install-Module -Name Az `
                 -Force `
                 -AllowClobber `
                 -Scope AllUsers `
                 -ErrorAction SilentlyContinue 
+        
+            Write-EventLog -Message "Az Modules have been installed." `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
+                -EntryType Information
         }
-
-        Write-EventLog -Message "PowerShell 7 and Az Modules have been installed." `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
-            -EntryType Information
+        else {
+            Write-EventLog -Message "Az Modules are found. Skipping the installation." `
+                -Source $eventSource `
+                -EventLogName $eventLogName `
+                -EntryType Information
+        }
 
         # remove the AzureRM module if it exists
         if (Get-Module -ListAvailable -Name AzureRM) { 
@@ -596,7 +608,7 @@ try {
         Join-Domain -DomainName $DomainName `
             -DomainServerIpAddress $DomainServerIpAddress `
             -Credential $credential `
-            -MaxRetries 12 `
+            -MaxRetries 10 `
             -RetryIntervalSeconds 5
     }
 }
