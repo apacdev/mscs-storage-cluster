@@ -92,6 +92,9 @@ $adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
+$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Join-MscsDomain.ps1"
+$scriptPath = "C:\Temp\Join-MscsDomain.ps1"
+
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
     [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $eventLogName)
@@ -259,7 +262,11 @@ Function Get-WebResourcesWithRetries {
         [Parameter(Mandatory = $true)]
         [string] $DestinationPath,
 
-        [int] $MaxRetries = 5
+        [Parameter(Mandatory = $true)]
+        [int] $MaxRetries = 5,
+
+        [Parameter(Mandatory = $true)]
+        [int] $RetryIntervalSeconds = 1
     )
 
     $retryCount = 0
@@ -621,17 +628,15 @@ try {
         }
     }
     else {
-
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
-        
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
-        
-        Join-Domain -DomainName $DomainName `
-            -DomainServerIpAddress $DomainServerIpAddress `
-            -Credential $credential `
-            -MaxRetries 10 `
-            -RetryIntervalSeconds 5
+        Get-WebResourcesWithRetries -SrouceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 3 -RetryIntervalSeconds 1
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress $DomainServerIpAddress -Credential '$credential'`""
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+        Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -Force
     }
 }
 catch { Write-EventLog -Message $_.Exception.Message -Source $eventSource -EventLogName $eventLogName -EntryType Error }
