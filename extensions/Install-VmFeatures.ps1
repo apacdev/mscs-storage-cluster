@@ -523,13 +523,18 @@ Function Join-Domain {
         if ((Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
             Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             
+            try {
             # Check if the domain controller is ready to accept a computer join
             Add-Computer -DomainName $DomainName `
                     -Credential $Credential `
                     -Restart `
                     -Force
-
-            Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+                    Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            }
+            catch {
+                Write-EventLog -Message "Failed to join domain $DomainName. Error: $($_.Exception.Message)" -Source $eventSource -EventLogName $eventLogName -EntryType Error
+            }
+            
             return
         }
         $retries++
