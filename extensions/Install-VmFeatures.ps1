@@ -19,7 +19,7 @@ Copyright (c) Microsoft Corporation. All rights reserved.
 patrick.shim@live.co.kr (Patrick Shim)
 
 .VERSION
-1.0.0.3
+1.0.0.5
 
 .SYNOPSIS
 Custom Script Extension to install applications and Windows Features on Windows VMs.
@@ -30,7 +30,7 @@ a. Common - PowerShell 7 and Az Modules
 b. 1 x AD Domain Controller - Active Directory Domain Services, DNS Server
 c. 2 x Node Servers - Failover Clustering, File Server Services such as NFS, SMB, and iSCSI
 
-.PARAMETER ServerList
+.PARAMETER NodeList
 An array that contains the VM names and IP addresses. It is passed as a parameter to the remote script.
 
 .PARAMETER VmName
@@ -55,12 +55,12 @@ Specifies the NetBIOS name of the domain.
 Specifies the Private IP Address of the domain server.
 
 .EXAMPLE
-.\InstallRolesAndFeatures.ps1 -ServerList @(@("server-01", "192.168.1.1")) -VmRole domaincontroller -AdminName Admin -adminSecret P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
+.\InstallRolesAndFeatures.ps1 -NodeList @(@("server-01", "192.168.1.1")) -VmRole domaincontroller -AdminName Admin -adminSecret P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
 
 .NOTES
 - This script is tested on Windows Server 2022 VMs.
 - This script requires elevated privileges to run, i.e., as an administrator.
-- The `ServerList` parameter has default values for testing purposes.
+- The `NodeList` parameter has default values for testing purposes.
 - The `VmRole` parameter must be one of the following: `domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node.
 - The `AdminName` and `-adminSecret` parameters must specify the name and password of an administrator account for the domain.
 #>
@@ -74,7 +74,9 @@ param(
     [Parameter(Mandatory = $true)] [string] $DomainName,
     [Parameter(Mandatory = $true)] [string] $DomainNetBiosName,
     [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
-    [Parameter(Mandatory = $true)] [array]  $ServerList
+    [Parameter(Mandatory = $true)] [array]  $NodeList,
+    [Parameter(Mandatory = $true)] [string] $SaName,
+    [Parameter(Mandatory = $true)] [string] $SaKey
 )
 
 ############################################################################################################
@@ -510,6 +512,22 @@ Function Write-EventLog {
     $log = New-Object System.Diagnostics.EventLog($eventLogName)
     $log.Source = $Source
     $log.WriteEntry($Message, $EntryType)
+
+    # Set log directory and file
+    $logDirectory = "C:\temp\cselogs"
+    $logFile = Join-Path $logDirectory "$(Get-Date -Format 'yyyyMMdd').log"
+
+    # Create the log directory if it does not exist
+    if (-not (Test-Path $logDirectory)) {
+        New-Item -ItemType Directory -Path $logDirectory | Out-Null
+    }
+
+    # Prepare log entry
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = "[$timestamp] $Message"
+
+    # Write log entry to the file
+    Add-Content -Path $logFile -Value $logEntry
 }
 
 Function Join-Domain {
@@ -551,20 +569,6 @@ Function Join-Domain {
             $retries++
         }
     }
-}
-Function Set-MSClusteringService { 
-            
-    New-Cluster -Name $ClusterName `
-        -Node $env:computername `
-        -StaticAddress $ClusterIp `
-        -NoStorage `
-        -Force
-
-    Add-ClusterNode -Cluster $ClusterName `
-        -Node $env:computername `
-        -NodeCredential $credential `
-        -Force
-
 }
 
 ############################################################################################################
