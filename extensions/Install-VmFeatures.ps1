@@ -555,8 +555,13 @@ Function Join-Domain {
         }
         else {
             Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+            Write-EventLog -Message "Flushing DNS before setting the client DNS to the domain controller" -Source $eventSource -EventLogName $eventLogName -EntryType Information        
+            Clear-DnsClientCache
+
             # Set DNS server to the domain controller
             Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
+            Clear-DnsClientCache
+
             Write-EventLog -Message "Set DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
             Write-EventLog -Message "Sleeping for some minutes..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             
@@ -565,14 +570,21 @@ Function Join-Domain {
             
             # Join domain
             Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            Add-Computer -ComputerName $env:COMPUTERNAME `
-                -LocalCredential $Credential `
-                -DomainName $DomainName `
-                -Credential $Credential `
-                -Force
+            try {
+                Add-Computer -ComputerName $env:COMPUTERNAME `
+                    -LocalCredential $Credential `
+                    -DomainName $DomainName `
+                    -Credential $Credential `
+                    -Force
                 
-            Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            break
+                Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+                break
+            }
+            catch {
+                Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+                Start-Sleep -Seconds $RetryIntervalSeconds
+                $retries++
+            }
         }
     }
 }
