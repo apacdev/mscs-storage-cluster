@@ -123,8 +123,7 @@ Function Test-WindowsFeatureInstalled {
 # Function to install specified Windows Features.
 Function Install-RequiredWindowsFeatures {
     param(
-        [Parameter(Mandatory = $true)]
-        [System.Collections.Generic.List[string]] $FeatureList
+        [Parameter(Mandatory = $true)] [System.Collections.Generic.List[string]] $FeatureList
     )
     
     $toInstallList = New-Object System.Collections.Generic.List[string]
@@ -165,10 +164,8 @@ Function Install-RequiredWindowsFeatures {
 # Function to check if PowerShell 7 is installed. If not, install it and install the Az module.
 Function Install-PowerShellWithAzModules {
     param(
-        [Parameter(Mandatory = $true)]
-        [string] $Url,
-        [Parameter(Mandatory = $true)]
-        [string] $MsiPath
+        [Parameter(Mandatory = $true)] [string] $Url,
+        [Parameter(Mandatory = $true)] [string] $MsiPath
     )
     
     try {
@@ -256,17 +253,10 @@ Function Install-PowerShellWithAzModules {
 # Function to download a file from a URL and retry if the download fails.
 Function Get-WebResourcesWithRetries {
     param (
-        [Parameter(Mandatory = $true)]
-        [string] $SourceUrl,
-
-        [Parameter(Mandatory = $true)]
-        [string] $DestinationPath,
-
-        [Parameter(Mandatory = $false)]
-        [int] $MaxRetries = 5,
-
-        [Parameter(Mandatory = $false)]
-        [int] $RetryIntervalSeconds = 1
+        [Parameter(Mandatory = $true)] [string] $SourceUrl,
+        [Parameter(Mandatory = $true)] [string] $DestinationPath,
+        [Parameter(Mandatory = $false)] [int] $MaxRetries = 5,
+        [Parameter(Mandatory = $false)] [int] $RetryIntervalSeconds = 1
     )
 
     $retryCount = 0
@@ -360,10 +350,8 @@ Function Set-ADDomainServices {
 # Function to set extra VM configurations
 Function Set-DefaultVmEnvironment {
     param(
-        [Parameter(Mandatory = $true)]
-        [string] $TempFolderPath,
-        [Parameter(Mandatory = $true)]
-        [string] $TimeZone
+        [Parameter(Mandatory = $true)] [string] $TempFolderPath,
+        [Parameter(Mandatory = $true)] [string] $TimeZone
     )
     if (-not (Test-Path -Path $TempFolderPath)) { 
         New-Item -ItemType Directory -Path $TempFolderPath 
@@ -503,17 +491,10 @@ Function Set-RequiredFirewallRules {
 # Function to simplify the creation of an event log entry.
 Function Write-EventLog {
     param(
-        [Parameter(Mandatory = $true)]
-        [string] $Message,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Source,
-
-        [Parameter(Mandatory = $true)]
-        [string] $EventLogName,
-
-        [Parameter(Mandatory = $false)]
-        [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
+        [Parameter(Mandatory = $true)] [string] $Message,
+        [Parameter(Mandatory = $true)] [string] $Source,
+        [Parameter(Mandatory = $true)] [string] $EventLogName,
+        [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
     
     $log = New-Object System.Diagnostics.EventLog($EventLogName)
@@ -541,18 +522,19 @@ Function Write-EventLog {
 # Execution Body
 ############################################################################################################
 
-Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-    -Source $eventSource `
-    -EventLogName $eventLogName `
-    -EntryType Information
 
-try {    
 
-    Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
-    Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
+try {
+        Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
+            -Source $eventSource `
+            -EventLogName $eventLogName `
+            -EntryType Information
+
+        Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
+        Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
     # Install required Windows Features for Domain Controller Setup
-    if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|node)).*$') {
+    if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|failover-node|failover|node)).*$') {
 
         Set-RequiredFirewallRules -IsActiveDirectory $true 
         
@@ -572,7 +554,7 @@ try {
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
-        Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 3 -RetryIntervalSeconds 1
+        Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
@@ -580,4 +562,6 @@ try {
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -Force
     }
 }
-catch { Write-EventLog -Message $_.Exception.Message -Source $eventSource -EventLogName $eventLogName -EntryType Error }
+catch {
+    Write-EventLog -Message $_.Exception.Message -Source $eventSource -EventLogName $eventLogName -EntryType Error 
+}
