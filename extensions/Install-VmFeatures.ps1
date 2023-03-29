@@ -561,19 +561,9 @@ Function Join-Domain {
             $retries++
         }
         else {
-            Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+           
             Write-EventLog -Message "Flushing DNS before setting the client DNS to the domain controller" -Source $eventSource -EventLogName $eventLogName -EntryType Information        
             Clear-DnsClientCache
-
-            # Set DNS server to the domain controller
-            Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
-            Clear-DnsClientCache
-
-            Write-EventLog -Message "Set DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            Write-EventLog -Message "Sleeping for some minutes..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            
-            Start-Sleep -Seconds 30
-            Write-EventLog -Message "Woke up to join the domain..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
             
             # Join domain
             Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
@@ -632,7 +622,7 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
         Get-WebResourcesWithRetries -SrouceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 3 -RetryIntervalSeconds 1
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress $DomainServerIpAddress -Credential '$credential'`""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$DomainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
