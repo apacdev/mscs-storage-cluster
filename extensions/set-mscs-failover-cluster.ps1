@@ -8,13 +8,6 @@ param(
     [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $StorageAccountKey = "BD5ePqIHLZ4yuu57TjocxCH4JCW6LlPY36PpDpdl+JZI8tUPwI4M/r0Afmc13tHkzrivtMvpS9a3+AStT7qcMg=="
 )
 
-# $nodeList = @("mscswvm-node-02", "172.16.1.101"), @("mscswvm-node-03", "172.16.1.102")
-# $clusterIpAddress = "172.16.1.50"
-# $asdFriendlyName = "Msft Virtual Disk"
-# $asdVolumeName = "cluster-shared-volume"
-#$ storageAccountName = "mscskrcommonstoragespace"
-# $storageAccountKey = "BD5ePqIHLZ4yuu57TjocxCH4JCW6LlPY36PpDpdl+JZI8tUPwI4M/r0Afmc13tHkzrivtMvpS9a3+AStT7qcMg=="
-
 Function Write-EventLog {
     param(
         [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Message,
