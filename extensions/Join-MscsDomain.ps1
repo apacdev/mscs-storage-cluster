@@ -2,7 +2,7 @@ param (
     [Parameter(Mandatory = $true)] [string] $DomainName,
     [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
     [Parameter(Mandatory = $true)] [string] $AdminName,
-    [Parameter(Mandatory = $true)] [string] $AdminPass,
+    [Parameter(Mandatory = $true)] [string] $AdminPass
 )
  
 $EventSource = "CustomScriptEvent"
@@ -10,6 +10,8 @@ $EventLogName = "Application"
 $MaxRetries = 30
 $RetryIntervalSeconds = 1
 
+$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
+ 
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
     [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
@@ -59,12 +61,12 @@ Function Write-EventLog {
   
   while ($retries -lt $MaxRetries) {
       if ( $true -ne (Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
-          Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress not established. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+          Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress not established. Retrying in $RetryIntervalSeconds seconds." -Source $EventSource -EventLogName $EventLogName -EntryType Information
           Start-Sleep -Seconds $RetryIntervalSeconds
           $retries++
       }
       else {
-          Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+          Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -Source $EventSource -EventLogName $EventLogName -EntryType Information
 
           Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
           Clear-DnsClientCache
@@ -73,7 +75,7 @@ Function Write-EventLog {
           Test-NetConnection -ComputerName $DomainName
 
           # Join domain
-          Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
+          Write-EventLog -Message "Joining domain $DomainName" -Source $EventSource -EventLogName $EventLogName -EntryType Information
           try {
               Add-Computer -ComputerName $env:COMPUTERNAME `
                   -LocalCredential $Credential `
@@ -81,11 +83,11 @@ Function Write-EventLog {
                   -Credential $Credential `
                   -Force
 
-              Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+              Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $EventSource -EventLogName $EventLogName -EntryType Information
               break
           }
           catch {
-              Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+              Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $RetryIntervalSeconds seconds." -Source $EventSource -EventLogName $EventLogName -EntryType Information
               Start-Sleep -Seconds $RetryIntervalSeconds
               $retries++
           }
