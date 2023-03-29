@@ -6,8 +6,8 @@ param (
  
 $EventSource = "CustomScriptEvent"
 $EventLogName = "Application"
-$MaxRetries = 10
-$RetryIntervalSeconds = 5
+$MaxRetries = 30
+$RetryIntervalSeconds = 1
 
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
@@ -63,19 +63,13 @@ Function Write-EventLog {
           $retries++
       }
       else {
-          Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress established." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-          Write-EventLog -Message "Flushing DNS before setting the client DNS to the domain controller" -Source $eventSource -EventLogName $eventLogName -EntryType Information        
-          Clear-DnsClientCache
+          Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -Source $eventSource -EventLogName $eventLogName -EntryType Information
 
-          # Set DNS server to the domain controller
           Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
           Clear-DnsClientCache
-
-          Write-EventLog -Message "Set DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-          Write-EventLog -Message "Sleeping for some minutes..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-
-          Start-Sleep -Seconds 30
-          Write-EventLog -Message "Woke up to join the domain..." -Source $eventSource -EventLogName $eventLogName -EntryType Information
+          
+          Test-NetConnection -ComputerName 'www.google.com'
+          Test-NetConnection -ComputerName $DomainName
 
           # Join domain
           Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
