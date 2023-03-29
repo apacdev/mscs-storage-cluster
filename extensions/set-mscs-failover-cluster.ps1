@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $StorageAccountKey = "BD5ePqIHLZ4yuu57TjocxCH4JCW6LlPY36PpDpdl+JZI8tUPwI4M/r0Afmc13tHkzrivtMvpS9a3+AStT7qcMg=="
 )
 
-# $nodeList = @("mscswvm-02", "172.16.1.101"), @("mscswvm-03", "172.16.1.102")
+# $nodeList = @("mscswvm-node-02", "172.16.1.101"), @("mscswvm-node-03", "172.16.1.102")
 # $clusterIpAddress = "172.16.1.50"
 # $asdFriendlyName = "Msft Virtual Disk"
 # $asdVolumeName = "cluster-shared-volume"
@@ -63,6 +63,7 @@ Function Set-MscsFailoverCluster {
     $nodes = @()
     if ($null -eq (Get-Cluster -Name $ClusterName)) {
         Write-EventLog -Message "Creating a new failover cluster named $ClusterName" -Source $EventSource -EventLogName $EventLogName
+        
         if (($NodeList.Count -eq 0) -or ($null -eq $NodeList)) {
             Write-EventLog -Message "No node list is provided. Using all nodes in the domain." -Source $EventSource -EventLogName $EventLogName
             $nodes = Get-ADComputer -Filter { Name -like "*node*" } | Select-Object -Property DNSHostName
@@ -72,15 +73,15 @@ Function Set-MscsFailoverCluster {
                 $nodes += ("$($node[0]).$DomainName")
             }
         }
-    }
-    try {
-        Write-EventLog -Message "Creating a new failover cluster named $ClusterName" -Source $EventSource -EventLogName $EventLogName
-        New-Cluster -Name $ClusterName -Node $nodes -StaticAddress $ClusterIpAddress -NoStorage
-    }
-    catch {
-        Write-EventLog -Message "Failed to create a new failover cluster named $ClusterName" -Source $EventSource -EventLogName $EventLogName -EntryType [System.Diagnostics.EventLogEntryType]::Error
-        Write-Error $_.Exception.Message
-        throw $_.Exception
+        try {
+            Write-EventLog -Message "Creating a new failover cluster named $ClusterName" -Source $EventSource -EventLogName $EventLogName
+            New-Cluster -Name $ClusterName -Node $nodes -StaticAddress $ClusterIpAddress -NoStorage
+        }
+        catch {
+            Write-EventLog -Message "Failed to create a new failover cluster named $ClusterName" -Source $EventSource -EventLogName $EventLogName -EntryType [System.Diagnostics.EventLogEntryType]::Error
+            Write-Error $_.Exception.Message
+            throw $_.Exception
+        }
     }
 }
 
