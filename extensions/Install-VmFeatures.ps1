@@ -181,7 +181,7 @@ Function Install-PowerShellWithAzModules {
         
         # check if msi installer exists. if yes then skip the download and go to the installation.
         if (-not (Test-Path -Path $msiPath)) {
-            Get-WebResourcesWithRetries -SrouceUrl $url `
+            Get-WebResourcesWithRetries -SourceUrl $url `
                 -DestinationPath $msiPath
             
             Start-Process -FilePath msiexec.exe -ArgumentList "/i $msiPath /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
@@ -262,10 +262,10 @@ Function Get-WebResourcesWithRetries {
         [Parameter(Mandatory = $true)]
         [string] $DestinationPath,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [int] $MaxRetries = 5,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [int] $RetryIntervalSeconds = 1
     )
 
@@ -537,55 +537,6 @@ Function Write-EventLog {
     Add-Content -Path $logFile -Value $logEntry
 }
 
-Function Join-Domain {
-    param (
-        [Parameter(Mandatory = $true)] [string] $DomainName,
-        [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
-        [Parameter(Mandatory = $true)] [pscredential] $Credential,
-        [Parameter()] [int] $MaxRetries = 10,
-        [Parameter()] [int] $RetryIntervalSeconds = 5
-    )
-    
-    Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-
-    # Join domain
-    Write-EventLog -Message "Setting DNS server on this server to $DomainServerIpAddress" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-                
-    $retries = 0
-    
-    # Wait for network connectivity to the domain server
-    while ($retries -lt $MaxRetries) {
-        if ( $true -ne (Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
-            Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress not established. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            Start-Sleep -Seconds $RetryIntervalSeconds
-            $retries++
-        }
-        else {
-           
-            Write-EventLog -Message "Flushing DNS before setting the client DNS to the domain controller" -Source $eventSource -EventLogName $eventLogName -EntryType Information        
-            Clear-DnsClientCache
-            
-            # Join domain
-            Write-EventLog -Message "Joining domain $DomainName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
-            try {
-                Add-Computer -ComputerName $env:COMPUTERNAME `
-                    -LocalCredential $Credential `
-                    -DomainName $DomainName `
-                    -Credential $Credential `
-                    -Force
-                
-                Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-                break
-            }
-            catch {
-                Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $RetryIntervalSeconds seconds." -Source $eventSource -EventLogName $eventLogName -EntryType Information
-                Start-Sleep -Seconds $RetryIntervalSeconds
-                $retries++
-            }
-        }
-    }
-}
-
 ############################################################################################################
 # Execution Body
 ############################################################################################################
@@ -622,10 +573,10 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 3 -RetryIntervalSeconds 1
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$DomainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
-        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest -Force
     }
 }
