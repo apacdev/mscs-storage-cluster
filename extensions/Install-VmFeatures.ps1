@@ -19,7 +19,7 @@ Copyright (c) Microsoft Corporation. All rights reserved.
 patrick.shim@live.co.kr (Patrick Shim)
 
 .VERSION
-1.0.0.5
+1.0.0.10 / 2022-03-30
 
 .SYNOPSIS
 Custom Script Extension to install applications and Windows Features on Windows VMs.
@@ -66,18 +66,33 @@ Specifies the Private IP Address of the domain server.
 #>
 
 param(
-    [Parameter(Mandatory = $true)] [string] $ResourceGroupName,
-    [Parameter(Mandatory = $true)] [string] $VmRole,
-    [Parameter(Mandatory = $true)] [string] $VmName,
-    [Parameter(Mandatory = $true)] [string] $AdminName,
-    [Parameter(Mandatory = $true)] [string] $Secret,
-    [Parameter(Mandatory = $true)] [string] $DomainName,
-    [Parameter(Mandatory = $true)] [string] $DomainNetBiosName,
-    [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
-    [Parameter(Mandatory = $true)] [array]  $NodeList,
-    [Parameter(Mandatory = $true)] [string] $SaName,
-    [Parameter(Mandatory = $true)] [string] $SaKey
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ResourceGroupName,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $VmRole,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $VmName,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $AdminName,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Secret,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainName,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainNetBiosName,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainServerIpAddress,
+    [Parameter(Mandatory = $true)] [array]  [ValidateNotNullOrEmpty()] $NodeList,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaName,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaKey,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterName,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterIp
 )
+
+Write-Output "ResourceGroupName: $ResourceGroupName"
+Write-Output "VmRole: $VmRole"
+Write-Output "VmName: $VmName"
+Write-Output "AdminName: $AdminName"
+Write-Output "DomainName: $DomainName"
+Write-Output "DomainNetBiosName: $DomainNetBiosName"
+Write-Output "DomainServerIpAddress: $DomainServerIpAddress"
+Write-Output "NodeList: $NodeList"
+Write-Output "SaName: $SaName"
+Write-Output "SaKey: $SaKey"
+Write-Output "ClusterName: $ClusterName"
+Write-Output "ClusterIp: $ClusterIp"
 
 ############################################################################################################
 # Variable Definitions
@@ -522,8 +537,6 @@ Function Write-EventLog {
 # Execution Body
 ############################################################################################################
 
-
-
 try {
         Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
             -Source $eventSource `
@@ -564,6 +577,7 @@ try {
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
+        
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
         Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
             -Source $eventSource `
