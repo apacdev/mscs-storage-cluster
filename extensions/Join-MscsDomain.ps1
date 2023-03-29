@@ -1,7 +1,8 @@
 param (
     [Parameter(Mandatory = $true)] [string] $DomainName,
     [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
-    [Parameter(Mandatory = $true)] [pscredential] $Credential
+    [Parameter(Mandatory = $true)] [string] $AdminName,
+    [Parameter(Mandatory = $true)] [string] $AdminPass,
 )
  
 $EventSource = "CustomScriptEvent"
