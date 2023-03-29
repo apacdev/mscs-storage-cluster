@@ -257,7 +257,7 @@ Function Install-PowerShellWithAzModules {
 Function Get-WebResourcesWithRetries {
     param (
         [Parameter(Mandatory = $true)]
-        [string] $SrouceUrl,
+        [string] $SourceUrl,
 
         [Parameter(Mandatory = $true)]
         [string] $DestinationPath,
@@ -283,7 +283,7 @@ Function Get-WebResourcesWithRetries {
                 $headers["Range"] = "bytes=$fileLength-"
             }
 
-            $response = Invoke-WebRequest -Uri $Url `
+            $response = Invoke-WebRequest -Uri $SourceUrl `
                 -Headers $headers `
                 -OutFile $DestinationPath `
                 -UseBasicParsing `
@@ -304,14 +304,14 @@ Function Get-WebResourcesWithRetries {
     }
 
     if (-not $completed) { 
-        Write-EventLog -Message "Failed to download file from $Url" `
+        Write-EventLog -Message "Failed to download file from $SourceUrl" `
             -Source $eventSource `
             -EventLogName $eventLogName `
             -EntryType Error
     } 
 
     else {
-        Write-EventLog -Message "Download of $Url completed successfully" `
+        Write-EventLog -Message "Download of $SourceUrl completed successfully" `
             -Source $eventSource `
             -EventLogName $eventLogName `
             -EntryType Information
@@ -510,13 +510,13 @@ Function Write-EventLog {
         [string] $Source,
 
         [Parameter(Mandatory = $true)]
-        [string] $eventLogName,
+        [string] $EventLogName,
 
         [Parameter(Mandatory = $false)]
         [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
     
-    $log = New-Object System.Diagnostics.EventLog($eventLogName)
+    $log = New-Object System.Diagnostics.EventLog($EventLogName)
     $log.Source = $Source
     $log.WriteEntry($Message, $EntryType)
 
@@ -621,7 +621,7 @@ try {
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
-        Get-WebResourcesWithRetries -SrouceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 3 -RetryIntervalSeconds 1
+        Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 3 -RetryIntervalSeconds 1
         $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$DomainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
