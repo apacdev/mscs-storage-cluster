@@ -564,7 +564,7 @@ try {
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
-        Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User ".\$AdminName" -RunLevel Highest -Force
+        Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
         Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
             -Source $eventSource `
             -EventLogName $eventLogName `
