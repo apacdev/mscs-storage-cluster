@@ -93,7 +93,7 @@ $credential = New-Object System.Management.Automation.PSCredential($AdminName, $
 $eventSource = "CustomScriptEvent"
 $eventLogName = "Application"
 $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Join-MscsDomain.ps1"
-$scriptPath = "C:\Temp\Join-MscsDomain.ps1"
+$scriptPath = "C:\\Temp\\Join-MscsDomain.ps1"
 
 # Check whether the event source exists, and create it if it doesn't exist.
 if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
