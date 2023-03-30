@@ -103,16 +103,56 @@ $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
 $powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/join-mscs-domain.ps1"
-$scriptPath = "C:\\Temp\\join-mscs-domain.ps1"
-$postConfigScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
-$postConfigScriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
+$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Join-MscsDomain.ps1"
+$scriptPath = "C:\\Temp\\Join-MscsDomain.ps1"
 $adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
 
 ############################################################################################################
 # Function Definitions
 ############################################################################################################
+
+# Function to simplify the creation of an event log entry.
+Function Write-EventLog {
+    param(
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Message,
+        [Parameter(Mandatory = $false)] [string] [ValidateNotNullOrEmpty()] [string] $Source = "CustomScriptEvent",
+        [Parameter(Mandatory = $false)] [string] [ValidateNotNullOrEmpty()] [string] $EventLogName = "Application",
+        [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] [ValidateNotNullOrEmpty()] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
+    )
+    
+    # Check whether the event source exists, and create it if it doesn't exist.
+    if (-not [System.Diagnostics.EventLog]::SourceExists($Source)) { [System.Diagnostics.EventLog]::CreateEventSource($Source, $EventLogName) }
+
+    $log = New-Object System.Diagnostics.EventLog($EventLogName)
+    $log.Source = $Source
+    $log.WriteEntry($Message, $EntryType)
+
+    # Set log directory and file
+    $logDirectory = "C:\\Temp\\CseLogs"
+    $logFile = Join-Path $logDirectory "$(Get-Date -Format 'yyyyMMdd').log"
+
+    # Create the log directory if it does not exist
+    if (-not (Test-Path $logDirectory)) {
+        New-Item -ItemType Directory -Path $logDirectory | Out-Null
+    }
+
+    # Prepare log entry
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = "[$timestamp] $Message"
+
+    try {
+        # Write log entry to the file
+        Add-Content -Path $logFile -Value $logEntry
+        Write-Host $logEntry
+        Write-Output $logEntry
+    }
+    catch {
+        Write-Host "Failed to write log entry to file: $($_.Exception.Message)"
+        Write-Error "Failed to write log entry to file: $($_.Exception.Message)"
+        thorw $_.Exception
+    }
+}
 
 # Function to check if the VM has the specified Windows Feature installed.  Returns true if the feature is installed, false otherwise.
 Function Test-WindowsFeatureInstalled {
@@ -151,22 +191,16 @@ Function Install-RequiredWindowsFeatures {
             try {
                 Install-WindowsFeature -Name $feature -IncludeManagementTools -IncludeAllSubFeature
                 Write-EventLog -Message "Windows Feature $feature has been installed." `
-                    -Source $eventSource `
-                    -EventLogName $eventLogName `
                     -EntryType Information
             }
             catch {
                 Write-EventLog -Message "An error occurred while installing Windows Feature $feature (Error: $($_.Exception.Message))." `
-                    -Source $eventSource `
-                    -EventLogName $eventLogName `
                     -EntryType Error
             }
         }
     }
     else {
         Write-EventLog -Message "Nothing to install. All required features are installed." `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Information
     }
 }
@@ -194,16 +228,12 @@ Function Install-PowerShellWithAzModules {
             Start-Process -FilePath msiexec.exe -ArgumentList "/i $msiPath /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
             
             Write-EventLog -Message "Installing PowerShell 7 completed." `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
                 -EntryType Information
         }
         else {
             # if msi installer exists, then just install in.
             Start-Process -FilePath msiexec.exe -ArgumentList "/i $Msi /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
             Write-EventLog -Message "Installing PowerShell 7 completed." `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
                 -EntryType Information
         }
 
@@ -215,14 +245,10 @@ Function Install-PowerShellWithAzModules {
         }
         else {
             Write-EventLog -Message "NuGet Package Provider is found. Skipping the installation." `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
                 -EntryType Information
         }
         
         Write-EventLog -Message "Installing the Az module." `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Information
 
         # Ensure the Az module is installed
@@ -234,14 +260,10 @@ Function Install-PowerShellWithAzModules {
                 -ErrorAction SilentlyContinue 
         
             Write-EventLog -Message "Az Modules have been installed." `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
                 -EntryType Information
         }
         else {
             Write-EventLog -Message "Az Modules are found. Skipping the installation." `
-                -Source $eventSource `
-                -EventLogName $eventLogName `
                 -EntryType Information
         }
 
@@ -254,8 +276,6 @@ Function Install-PowerShellWithAzModules {
     }
     catch {
         Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Error
     }
 }
@@ -305,15 +325,11 @@ Function Get-WebResourcesWithRetries {
 
     if (-not $completed) { 
         Write-EventLog -Message "Failed to download file from $SourceUrl" `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Error
     } 
 
     else {
         Write-EventLog -Message "Download of $SourceUrl completed successfully" `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Information
     }
 }
@@ -330,8 +346,6 @@ Function Set-ADDomainServices {
     )
     try {        
         Write-EventLog -Message 'Configuring Active Directory Domain Services...' `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Information
 
         Import-Module ADDSDeployment
@@ -345,14 +359,10 @@ Function Set-ADDomainServices {
             -Force
 
         Write-EventLog -Message 'Active Directory Domain Services has been configured.' `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType information
     }
     catch {
         Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $($_.Exception.Message))" `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Error
     }
 }
@@ -367,7 +377,10 @@ Function Set-DefaultVmEnvironment {
         New-Item -ItemType Directory -Path $TempFolderPath 
     }
 
-    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0
+    # Disable Internet Explorer Enchanced Security features on Windows
+    New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0 -PropertyType DWORD -Force | Out-Null
+    New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}" -Name "IsInstalled" -Value 0 -PropertyType DWORD -Force | Out-Null
+
     Set-TimeZone -Id $TimeZone
     Set-Item -Path WSMan:\localhost\Service\Auth\Basic -Value $true
     Set-Item -Path WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
@@ -492,55 +505,9 @@ Function Set-RequiredFirewallRules {
                 }
                 if ($rule.LocalPort) { $params.LocalPort = $rule.LocalPort }
                 New-NetFirewallRule @params -ErrorAction SilentlyContinue
-                Write-EventLog -Message "Created Windows Firewall rule: $ruleName" -Source $eventSource -EventLogName $eventLogName -EntryType Information
+                Write-EventLog -Message "Created Windows Firewall rule: $ruleName" -EntryType Information
             } 
         }
-    }
-}
-
-# Function to simplify the creation of an event log entry.
-Function Write-EventLog {
-    param(
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Message,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $Source,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $EventLogName,
-        [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] [ValidateNotNullOrEmpty()] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
-    )
-    
-    # Set event source and log name
-    $EventSource = "CustomScriptEvent"
-    $EventLogName = "Application"
-
-    # Check whether the event source exists, and create it if it doesn't exist.
-    if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName) }
-
-    $log = New-Object System.Diagnostics.EventLog($EventLogName)
-    $log.Source = $Source
-    $log.WriteEntry($Message, $EntryType)
-
-    # Set log directory and file
-    $logDirectory = "C:\\Temp\\CseLogs"
-    $logFile = Join-Path $logDirectory "$(Get-Date -Format 'yyyyMMdd').log"
-
-    # Create the log directory if it does not exist
-    if (-not (Test-Path $logDirectory)) {
-        New-Item -ItemType Directory -Path $logDirectory | Out-Null
-    }
-
-    # Prepare log entry
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logEntry = "[$timestamp] $Message"
-
-    try {
-        # Write log entry to the file
-        Add-Content -Path $logFile -Value $logEntry
-        Write-Host $logEntry
-        Write-Output $logEntry
-    }
-    catch {
-        Write-Host "Failed to write log entry to file: $($_.Exception.Message)"
-        Write-Error "Failed to write log entry to file: $($_.Exception.Message)"
-        thorw $_.Exception
     }
 }
 
@@ -550,8 +517,6 @@ Function Write-EventLog {
 
 try {
         Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Information
 
         Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
@@ -580,11 +545,8 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
         
-        Get-WebResourcesWithRetries -SourceUrl $postConfigScriptUrl -DestinationPath "C:\\Users\\$adminName\\Desktop\\set-mscs-failover-cluster.ps1" -MaxRetries 5 -RetryIntervalSeconds 1
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Information
 
         $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
@@ -594,11 +556,9 @@ try {
         
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
         Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-            -Source $eventSource `
-            -EventLogName $eventLogName `
             -EntryType Information
     }
 }
 catch {
-    Write-EventLog -Message $_.Exception.Message -Source $eventSource -EventLogName $eventLogName -EntryType Error 
+    Write-EventLog -Message $_.Exception.Message -EntryType Error 
 }
