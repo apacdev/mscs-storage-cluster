@@ -9,17 +9,13 @@ param (
 Function Write-EventLog {
     param(
         [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Message,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $Source,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $EventLogName,
+        [Parameter(Mandatory = $false)] [string] [ValidateNotNullOrEmpty()] [string] $Source = "CustomScriptEvent",
+        [Parameter(Mandatory = $false)] [string] [ValidateNotNullOrEmpty()] [string] $EventLogName = "Application",
         [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] [ValidateNotNullOrEmpty()] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
     
-    # Set event source and log name
-    $EventSource = "CustomScriptEvent"
-    $EventLogName = "Application"
-
     # Check whether the event source exists, and create it if it doesn't exist.
-    if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName) }
+    if (-not [System.Diagnostics.EventLog]::SourceExists($Source)) { [System.Diagnostics.EventLog]::CreateEventSource($Source, $EventLogName) }
 
     $log = New-Object System.Diagnostics.EventLog($EventLogName)
     $log.Source = $Source
@@ -56,14 +52,14 @@ $RetryIntervalSeconds = 1
 $TargetDns = "www.google.com"
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 
-Write-EventLog -Message "Joining domain $DomainName..." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+Write-EventLog -Message "Joining domain $DomainName..." -EntryType Information
 # Wait for network connectivity to the domain server
 
 $retries = 0
 
 while ($retries -lt $MaxRetries) {
     if ( $true -ne (Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
-        Write-EventLog -Message "Network connection to domain controller $DomainServerIpAddress cannot be reached. Retrying in $RetryIntervalSeconds seconds." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        Write-EventLog -Message "Network connection to domain controller $DomainServerIpAddress cannot be reached. Retrying in $RetryIntervalSeconds seconds." -EntryType Information
         Start-Sleep -Seconds $RetryIntervalSeconds
         $retries++
     }
@@ -75,10 +71,10 @@ while ($retries -lt $MaxRetries) {
         Write-EventLog -Message "Network connectivity to $TargetDns is OK."
 
         Test-NetConnection -ComputerName $DomainName
-        Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -EntryType Information
         
         # Join domain
-        Write-EventLog -Message "Joining domain $DomainName" -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        Write-EventLog -Message "Joining domain $DomainName" -EntryType Information
         try {
             Add-Computer -ComputerName $env:COMPUTERNAME `
                 -LocalCredential $Credential `
@@ -87,11 +83,11 @@ while ($retries -lt $MaxRetries) {
                 -Restart `
                 -Force
 
-            Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+            Write-EventLog -Message "Joined domain $DomainName. Now restarting the computer." -EntryType Information
             break
         }
         catch {
-            Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $RetryIntervalSeconds seconds." -Source $EventSource -EventLogName $EventLogName -EntryType Error
+            Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $RetryIntervalSeconds seconds." -EntryType Error
             Start-Sleep -Seconds $RetryIntervalSeconds
             $retries++
         }
