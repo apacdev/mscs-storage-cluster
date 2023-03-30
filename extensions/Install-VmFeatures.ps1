@@ -103,17 +103,11 @@ $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
 $powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
-$credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
-$eventSource = "CustomScriptEvent"
-$eventLogName = "Application"
 $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Join-MscsDomain.ps1"
 $scriptPath = "C:\\Temp\\Join-MscsDomain.ps1"
 
-# Check whether the event source exists, and create it if it doesn't exist.
-if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
-    [System.Diagnostics.EventLog]::CreateEventSource($eventSource, $eventLogName)
-}
+$adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
+$credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
 
 ############################################################################################################
 # Function Definitions
@@ -506,18 +500,25 @@ Function Set-RequiredFirewallRules {
 # Function to simplify the creation of an event log entry.
 Function Write-EventLog {
     param(
-        [Parameter(Mandatory = $true)] [string] $Message,
-        [Parameter(Mandatory = $true)] [string] $Source,
-        [Parameter(Mandatory = $true)] [string] $EventLogName,
-        [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Message,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $Source,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $EventLogName,
+        [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] [ValidateNotNullOrEmpty()] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
     
+    # Set event source and log name
+    $EventSource = "CustomScriptEvent"
+    $EventLogName = "Application"
+
+    # Check whether the event source exists, and create it if it doesn't exist.
+    if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName) }
+
     $log = New-Object System.Diagnostics.EventLog($EventLogName)
     $log.Source = $Source
     $log.WriteEntry($Message, $EntryType)
 
     # Set log directory and file
-    $logDirectory = "C:\temp\cselogs"
+    $logDirectory = "C:\\Temp\\CseLogs"
     $logFile = Join-Path $logDirectory "$(Get-Date -Format 'yyyyMMdd').log"
 
     # Create the log directory if it does not exist
@@ -529,8 +530,17 @@ Function Write-EventLog {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logEntry = "[$timestamp] $Message"
 
-    # Write log entry to the file
-    Add-Content -Path $logFile -Value $logEntry
+    try {
+        # Write log entry to the file
+        Add-Content -Path $logFile -Value $logEntry
+        Write-Host $logEntry
+        Write-Output $logEntry
+    }
+    catch {
+        Write-Host "Failed to write log entry to file: $($_.Exception.Message)"
+        Write-Error "Failed to write log entry to file: $($_.Exception.Message)"
+        thorw $_.Exception
+    }
 }
 
 ############################################################################################################
@@ -553,6 +563,7 @@ try {
         
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
+        
             Set-ADDomainServices -DomainName $DomainName `
                 -DomainNetBiosName $DomainNetbiosName `
                 -Credential $credential
@@ -567,6 +578,7 @@ try {
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
+        
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
             -Source $eventSource `
