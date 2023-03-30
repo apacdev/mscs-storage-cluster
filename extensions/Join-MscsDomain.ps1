@@ -5,21 +5,22 @@ param (
     [Parameter(Mandatory = $true)] [string] $AdminPass
 )
 
+# Function to simplify the creation of an event log entry.
 Function Write-EventLog {
     param(
-        [Parameter(Mandatory = $true)]
-        [string] $Message,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Source,
-
-        [Parameter(Mandatory = $true)]
-        [string] $EventLogName,
-
-        [Parameter(Mandatory = $false)]
-        [System.Diagnostics.EventLogEntryType] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Message,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $Source,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] [string] $EventLogName,
+        [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] [ValidateNotNullOrEmpty()] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
     
+    # Set event source and log name
+    $EventSource = "CustomScriptEvent"
+    $EventLogName = "Application"
+
+    # Check whether the event source exists, and create it if it doesn't exist.
+    if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName) }
+
     $log = New-Object System.Diagnostics.EventLog($EventLogName)
     $log.Source = $Source
     $log.WriteEntry($Message, $EntryType)
@@ -37,41 +38,45 @@ Function Write-EventLog {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logEntry = "[$timestamp] $Message"
 
-    # Write log entry to the file
-    Add-Content -Path $logFile -Value $logEntry
+    try {
+        # Write log entry to the file
+        Add-Content -Path $logFile -Value $logEntry
+        Write-Host $logEntry
+        Write-Output $logEntry
+    }
+    catch {
+        Write-Host "Failed to write log entry to file: $($_.Exception.Message)"
+        Write-Error "Failed to write log entry to file: $($_.Exception.Message)"
+        thorw $_.Exception
+    }
 }
 
-$EventSource = "CustomScriptEvent"
-$EventLogName = "Application"
 $MaxRetries = 30
 $RetryIntervalSeconds = 1
 $TargetDns = "www.google.com"
-
-# Check whether the event source exists, and create it if it doesn't exist.
-if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
-    [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
-}
-
 $Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
 
-Write-EventLog -Message "Joining domain $DomainName" -Source $EventSource -EventLogName $EventLogName -EntryType Information
+Write-EventLog -Message "Joining domain $DomainName..." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+# Wait for network connectivity to the domain server
+
 $retries = 0
 
-# Wait for network connectivity to the domain server
 while ($retries -lt $MaxRetries) {
     if ( $true -ne (Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
-        Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress not established. Retrying in $RetryIntervalSeconds seconds." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        Write-EventLog -Message "Network connection to domain controller $DomainServerIpAddress cannot be reached. Retrying in $RetryIntervalSeconds seconds." -Source $EventSource -EventLogName $EventLogName -EntryType Information
         Start-Sleep -Seconds $RetryIntervalSeconds
         $retries++
     }
     else {
-        Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -Source $EventSource -EventLogName $EventLogName -EntryType Information
         Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
         Clear-DnsClientCache
-          
+        
         Test-NetConnection -ComputerName $TargetDns
-        Test-NetConnection -ComputerName $DomainName
+        Write-EventLog -Message "Network connectivity to $TargetDns is OK."
 
+        Test-NetConnection -ComputerName $DomainName
+        Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -Source $EventSource -EventLogName $EventLogName -EntryType Information
+        
         # Join domain
         Write-EventLog -Message "Joining domain $DomainName" -Source $EventSource -EventLogName $EventLogName -EntryType Information
         try {
