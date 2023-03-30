@@ -103,8 +103,8 @@ $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
 $powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Join-MscsDomain.ps1"
-$scriptPath = "C:\\Temp\\Join-MscsDomain.ps1"
+$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/join-mscs-domain.ps1"
+$scriptPath = "C:\\Temp\\join-mscs-domain.ps1"
 $adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
 
@@ -190,18 +190,15 @@ Function Install-RequiredWindowsFeatures {
         foreach ($feature in $toInstallList) {
             try {
                 Install-WindowsFeature -Name $feature -IncludeManagementTools -IncludeAllSubFeature
-                Write-EventLog -Message "Windows Feature $feature has been installed." `
-                    -EntryType Information
+                Write-EventLog -Message "Windows Feature $feature has been installed." -EntryType Information
             }
             catch {
-                Write-EventLog -Message "An error occurred while installing Windows Feature $feature (Error: $($_.Exception.Message))." `
-                    -EntryType Error
+                Write-EventLog -Message "An error occurred while installing Windows Feature $feature (Error: $($_.Exception.Message))." -EntryType Error
             }
         }
     }
     else {
-        Write-EventLog -Message "Nothing to install. All required features are installed." `
-            -EntryType Information
+        Write-EventLog -Message "Nothing to install. All required features are installed." -EntryType Information
     }
 }
 
@@ -226,15 +223,12 @@ Function Install-PowerShellWithAzModules {
                 -DestinationPath $msiPath
             
             Start-Process -FilePath msiexec.exe -ArgumentList "/i $msiPath /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
-            
-            Write-EventLog -Message "Installing PowerShell 7 completed." `
-                -EntryType Information
+            Write-EventLog -Message "Installing PowerShell 7 completed." -EntryType Information
         }
         else {
             # if msi installer exists, then just install in.
             Start-Process -FilePath msiexec.exe -ArgumentList "/i $Msi /quiet /norestart /passive ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1" -Wait -ErrorAction SilentlyContinue
-            Write-EventLog -Message "Installing PowerShell 7 completed." `
-                -EntryType Information
+            Write-EventLog -Message "Installing PowerShell 7 completed." -EntryType Information
         }
 
         # contuning to install the Az modules.
@@ -275,8 +269,7 @@ Function Install-PowerShellWithAzModules {
         }
     }
     catch {
-        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" `
-            -EntryType Error
+        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" -EntryType Error
     }
 }
 
@@ -324,13 +317,11 @@ Function Get-WebResourcesWithRetries {
     }
 
     if (-not $completed) { 
-        Write-EventLog -Message "Failed to download file from $SourceUrl" `
-            -EntryType Error
+        Write-EventLog -Message "Failed to download file from $SourceUrl" -EntryType Error
     } 
 
     else {
-        Write-EventLog -Message "Download of $SourceUrl completed successfully" `
-            -EntryType Information
+        Write-EventLog -Message "Download of $SourceUrl completed successfully" -EntryType Information
     }
 }
 
@@ -358,12 +349,10 @@ Function Set-ADDomainServices {
             -SafeModeAdministratorPassword $Credential.Password `
             -Force
 
-        Write-EventLog -Message 'Active Directory Domain Services has been configured.' `
-            -EntryType information
+        Write-EventLog -Message 'Active Directory Domain Services has been configured.' -EntryType information
     }
     catch {
-        Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $($_.Exception.Message))" `
-            -EntryType Error
+        Write-EventLog -Message "An error occurred while installing Active Directory Domain Services (Error: $($_.Exception.Message))" -EntryType Error
     }
 }
 
@@ -546,8 +535,7 @@ try {
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
         
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
-        Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-            -EntryType Information
+        Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
 
         $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
@@ -555,8 +543,7 @@ try {
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
         
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
-        Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-            -EntryType Information
+        Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
     }
 }
 catch {
