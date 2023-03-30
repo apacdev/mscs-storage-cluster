@@ -103,9 +103,10 @@ $msi = "PowerShell-7.3.2-win-x64.msi"
 $msiPath = "$tempPath\\$msi"
 $powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
 $timeZone = "Singapore Standard Time"
-$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Join-MscsDomain.ps1"
-$scriptPath = "C:\\Temp\\Join-MscsDomain.ps1"
-
+$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/join-mscs-domain.ps1"
+$scriptPath = "C:\\Temp\\join-mscs-domain.ps1"
+$postConfigScriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
+$postConfigScriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
 $adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
 
@@ -579,6 +580,7 @@ try {
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
         
+        Get-WebResourcesWithRetries -SourceUrl $postConfigScriptUrl -DestinationPath "C:\\Users\\$adminName\\Desktop\\set-mscs-failover-cluster.ps1" -MaxRetries 5 -RetryIntervalSeconds 1
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
             -Source $eventSource `
