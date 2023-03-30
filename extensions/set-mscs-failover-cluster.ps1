@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory = $false)] [array] [ValidateNotNullOrEmpty()] $NodeList,
     [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterName = "mscs-cluster",
     [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $StorageAccountName = "mscskrcommonstoragespace",
-    [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $StorageAccountKey = "BD5ePqIHLZ4yuu57TjocxCH4JCW6LlPY36PpDpdl+JZI8tUPwI4M/r0Afmc13tHkzrivtMvpS9a3+AStT7qcMg=="
+    [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $StorageAccountKey
 )
 
 Function Write-EventLog {
@@ -16,6 +16,13 @@ Function Write-EventLog {
         [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] [ValidateNotNullOrEmpty()] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
     
+    # Set event source and log name
+    $EventSource = "CustomScriptEvent"
+    $EventLogName = "Application"
+
+    # Check whether the event source exists, and create it if it doesn't exist.
+    if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) { [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName) }
+
     $log = New-Object System.Diagnostics.EventLog($EventLogName)
     $log.Source = $Source
     $log.WriteEntry($Message, $EntryType)
@@ -33,16 +40,17 @@ Function Write-EventLog {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logEntry = "[$timestamp] $Message"
 
-    # Write log entry to the file
-    Add-Content -Path $logFile -Value $logEntry
-}
-
-$EventSource = "CustomScriptEvent"
-$EventLogName = "Application"
-
-# Check whether the event source exists, and create it if it doesn't exist.
-if (-not [System.Diagnostics.EventLog]::SourceExists($EventSource)) {
-    [System.Diagnostics.EventLog]::CreateEventSource($EventSource, $EventLogName)
+    try {
+        # Write log entry to the file
+        Add-Content -Path $logFile -Value $logEntry
+        Write-Host $logEntry
+        Write-Output $logEntry
+    }
+    catch {
+        Write-Host "Failed to write log entry to file: $($_.Exception.Message)"
+        Write-Error "Failed to write log entry to file: $($_.Exception.Message)"
+        thorw $_.Exception
+    }
 }
 
 Function Set-MscsFailoverCluster {
@@ -92,7 +100,6 @@ Function Set-MscsFailoverClusterQuorum {
         Write-EventLog -Message "Set-MscsFailoverClusterQuorum: Set-ClusterQuorum -CloudWitness -AccountName $StorageAccountName -AccessKey $StorageAccountKey -Cluster $ClusterName" -Source $EventSource -EventLogName $EventLogName
     }
     catch {
-        Write-Error $_.Exception.Message
         Write-EventLog -Message "Set-MscsFailoverClusterQuorum: $_.Exception.Message" -Source $EventSource -EventLogName $EventLogName -EntryType [System.Diagnostics.EventLogEntryType]::Error
         throw $_.Exception
     }
@@ -109,8 +116,7 @@ Function Set-MscsClusterSharedVolume {
         $drive = Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName } 
         $isPartitioned = Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName } | Get-Partition | Select-Object -Property DiskNumber, PartitionNumber, PartitionStyle, DriveLetter
 
-        if ($drive.PartitionStyle -eq "RAW")
-        {
+        if ($drive.PartitionStyle -eq "RAW") {
             Initialize-Disk -Number $drive.DiskNumber -PartitionStyle "GPT"
             Write-EventLog -Message "Set-MscsClusterSharedVolume: Initialize-Disk -Number $drive.DiskNumber -PartitionStyle GPT" -Source $EventSource -EventLogName $EventLogName
 
@@ -122,26 +128,27 @@ Function Set-MscsClusterSharedVolume {
                 
             Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })
             Write-EventLog -Message "Set-MscsClusterSharedVolume: Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })" -Source $EventSource -EventLogName $EventLogName
-        } else { 
+        }
+        else { 
             if ($null -eq $isPartitioned) {
                 $part = New-Partition -DiskNumber $drive.DiskNumber -AssignDriveLetter -UseMaximumSize 
-            Write-EventLog -Message "Set-MscsClusterSharedVolume: New-Partition -DiskNumber $drive.DiskNumber -AssignDriveLetter -UseMaximumSize" -Source $EventSource -EventLogName $EventLogName
+                Write-EventLog -Message "Set-MscsClusterSharedVolume: New-Partition -DiskNumber $drive.DiskNumber -AssignDriveLetter -UseMaximumSize" -Source $EventSource -EventLogName $EventLogName
 
-            Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force
-            Write-EventLog -Message "Set-MscsClusterSharedVolume: Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force" -Source $EventSource -EventLogName $EventLogName
+                Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force
+                Write-EventLog -Message "Set-MscsClusterSharedVolume: Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force" -Source $EventSource -EventLogName $EventLogName
                 
-            Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })
-            Write-EventLog -Message "Set-MscsClusterSharedVolume: Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })" -Source $EventSource -EventLogName $EventLogName  
+                Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })
+                Write-EventLog -Message "Set-MscsClusterSharedVolume: Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })" -Source $EventSource -EventLogName $EventLogName  
         
-            } else {
-            # delete the existing partner
+            }
+            else {
+                Write-EventLog -Message "Set-MscsClusterSharedVolume: Disk $DiskFriendlyName is already partitioned. Skipping partitioning." -Source $EventSource -EventLogName $EventLogName
             }
                         
-            }
+        }
     }
     catch {
         Write-EventLog -Message "Set-MscsClusterSharedVolume: $_.Exception.Message" -Source $EventSource -EventLogName $EventLogName -EntryType [System.Diagnostics.EventLogEntryType]::Error
-        Write-Error $_.Exception.Message
         throw $_.Exception
     }
 }
@@ -152,6 +159,5 @@ try {
     Set-MscsClusterSharedVolume -ClusterName $ClusterName -DiskFriendlyName "Msft Virtual Disk"
 }
 catch {
-    Write-Error $_.Exception.Message
     throw $_.Exception
 }
