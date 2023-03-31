@@ -17,13 +17,13 @@ param vm_02_name string
 param vm_03_name string
 
 @description('Subnet 01 name.')
-param subnet_01_name string 
+param subnet_01_name string
 
 @description('Subnet 02 name.')
 param subnet_02_name string
 
 @description('IPv4 address space for the virtual network (/16).')
-param vnet_ipv4_addr string 
+param vnet_ipv4_addr string
 
 @description('IPv6 address space for the virtual network (/16).')
 param vnet_ipv6_addr string
@@ -32,37 +32,37 @@ param vnet_ipv6_addr string
 param subnet_01_ipv4_addr string
 
 @description('IPv6 address space for the subnet 01 (/24).')
-param subnet_02_ipv4_addr string 
+param subnet_02_ipv4_addr string
 
 @description('IPv4 address space for the subnet 02 (/24).')
-param subnet_01_ipv6_addr string 
+param subnet_01_ipv6_addr string
 
 @description('IPv6 address space for the subnet 02 (/24).')
-param subnet_02_ipv6_addr string 
+param subnet_02_ipv6_addr string
 
 @description('Private IPv4 address for the Virtual Machine 01.')
-param iip_v4_01_addr string 
+param iip_v4_01_addr string
 
 @description('Private IPv4 address for the Virtual Machine 02.')
-param iip_v4_02_addr string 
+param iip_v4_02_addr string
 
 @description('Private IPv4 address for the Virtual Machine 03.')
 param iip_v4_03_addr string
 
 @description('Public IPv4 address for the Virtual Machine 01.')
-param eip_v4_01_name string 
+param eip_v4_01_name string
 
 @description('Public IPv4 address for the Virtual Machine 02.')
-param eip_v4_02_name string 
+param eip_v4_02_name string
 
 @description('Public IPv4 address for the Virtual Machine 03.')
 param eip_v4_03_name string
 
 @description('Private IPv6 address for the Virtual Machine 01.')
-param eip_v6_01_name string 
+param eip_v6_01_name string
 
 @description('Private IPv6 address for the Virtual Machine 02.')
-param eip_v6_02_name string 
+param eip_v6_02_name string
 
 @description('Private IPv6 address for the Virtual Machine 03.')
 param eip_v6_03_name string
@@ -75,6 +75,9 @@ param nic_02_name string
 
 @description('Name of Network Interface 03.')
 param nic_03_name string
+
+@description('Name of Internal Load Balancer.')
+param ilb_name string
 
 // create resource for Virtual Network (x.x.x.x/16)
 resource vnet_resource 'Microsoft.Network/virtualNetworks@2022-07-01' = {
@@ -312,7 +315,7 @@ resource eip_v4_01_resource 'Microsoft.Network/publicIPAddresses@2022-07-01' = {
   sku: {
     name: 'Standard'
   }
-  zones: ['1']
+  zones: [ '1' ]
   properties: {
     publicIPAllocationMethod: 'Static'
     publicIPAddressVersion: 'IPv4'
@@ -329,7 +332,7 @@ resource eip_v4_02_resource 'Microsoft.Network/publicIPAddresses@2022-07-01' = {
   sku: {
     name: 'Standard'
   }
-  zones:['2']
+  zones: [ '2' ]
   properties: {
     publicIPAllocationMethod: 'Static'
     publicIPAddressVersion: 'IPv4'
@@ -346,7 +349,7 @@ resource eip_v4_03_resource 'Microsoft.Network/publicIPAddresses@2022-07-01' = {
   sku: {
     name: 'Standard'
   }
-  zones:['2']
+  zones: [ '2' ]
   properties: {
     publicIPAllocationMethod: 'Static'
     publicIPAddressVersion: 'IPv4'
@@ -363,7 +366,7 @@ resource eip_v6_01_resource 'Microsoft.Network/publicIPAddresses@2022-07-01' = {
   sku: {
     name: 'Standard'
   }
-  zones: ['1']
+  zones: [ '1' ]
   properties: {
     publicIPAllocationMethod: 'Static'
     publicIPAddressVersion: 'IPv6'
@@ -380,7 +383,7 @@ resource eip_v6_02_resource 'Microsoft.Network/publicIPAddresses@2022-07-01' = {
   sku: {
     name: 'Standard'
   }
-  zones: ['2']
+  zones: [ '2' ]
   properties: {
     publicIPAllocationMethod: 'Static'
     publicIPAddressVersion: 'IPv6'
@@ -397,7 +400,7 @@ resource eip_v6_03_resource 'Microsoft.Network/publicIPAddresses@2022-07-01' = {
   sku: {
     name: 'Standard'
   }
-  zones: ['2']
+  zones: [ '2' ]
   properties: {
     publicIPAllocationMethod: 'Static'
     publicIPAddressVersion: 'IPv6'
@@ -466,6 +469,11 @@ resource nic_02_resource 'Microsoft.Network/networkInterfaces@2022-07-01' = {
           subnet: {
             id: subnet_02_resource.id
           }
+          loadBalancerBackendAddressPools: [
+            {
+              id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', ilb_name, 'pool')
+            }
+          ]
           privateIPAllocationMethod: 'Static'
           privateIPAddress: iip_v4_02_addr
           privateIPAddressVersion: 'IPv4'
@@ -489,6 +497,9 @@ resource nic_02_resource 'Microsoft.Network/networkInterfaces@2022-07-01' = {
       }
     ]
   }
+  dependsOn:[
+    ilb_resource
+  ]
 }
 
 // create resource for Network Interface 03
@@ -508,6 +519,11 @@ resource nic_03_resource 'Microsoft.Network/networkInterfaces@2022-07-01' = {
           subnet: {
             id: subnet_02_resource.id
           }
+          loadBalancerBackendAddressPools: [
+            {
+              id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', ilb_name, 'pool')
+            }
+          ]
           privateIPAllocationMethod: 'Static'
           privateIPAddress: iip_v4_03_addr
           privateIPAddressVersion: 'IPv4'
@@ -527,6 +543,74 @@ resource nic_03_resource 'Microsoft.Network/networkInterfaces@2022-07-01' = {
           publicIPAddress: {
             id: eip_v6_03_resource.id
           }
+        }
+      }
+    ]
+  }
+  dependsOn:[
+    ilb_resource
+  ]
+}
+
+// create resource for Load Balancer
+resource ilb_resource 'Microsoft.Network/loadBalancers@2022-09-01' = {
+  name: ilb_name
+  location: location
+  sku: {
+    name: 'Standard'
+    tier: 'Regional'
+  }
+  properties: {
+    frontendIPConfigurations: [
+      {
+        name: 'front'
+        properties: {
+          privateIPAllocationMethod: 'Static'
+          privateIPAddress: '172.16.1.50'
+          privateIPAddressVersion: 'IPv4'
+          subnet: {
+            id: subnet_02_resource.id
+          }
+        }
+        zones: [ 
+          '1' 
+          '2' 
+          '3' 
+        ]
+      }
+    ]
+    backendAddressPools: [ { 
+        name: 'pool'
+      }
+    ]
+    loadBalancingRules: [ {
+        name: 'rule'
+        properties: {
+          frontendIPConfiguration: {
+            id: resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations', ilb_name, 'front')
+          }
+          backendAddressPool: {
+            id: resourceId('Microsoft.Network/loadBalancers/backendAddressPools', ilb_name, 'pool')
+          }
+          protocol: 'All'
+          frontendPort: 0
+          backendPort: 0
+          enableFloatingIP: false
+          idleTimeoutInMinutes: 15
+          loadDistribution: 'Default'
+          probe: {
+            id: resourceId('Microsoft.Network/loadBalancers/probes', ilb_name, 'probe')
+          }
+        }
+      }
+    ]
+    probes: [ {
+        name: 'probe'
+        properties: {
+          protocol: 'Tcp'
+          port: 61800
+          intervalInSeconds: 15
+          numberOfProbes: 5
         }
       }
     ]

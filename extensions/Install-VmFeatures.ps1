@@ -269,7 +269,7 @@ Function Install-PowerShellWithAzModules {
         }
     }
     catch {
-        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))" -EntryType Error
+        Write-EventLog -Message "Error installing PowerShell 7 with Az Modules (Error: $($_.Exception.Message))." -EntryType Error
     }
 }
 
@@ -312,16 +312,18 @@ Function Get-WebResourcesWithRetries {
         }
         catch {
             $retryCount++
+            Write-EventLog -Message "Error downloading file from $SourceUrl (Error: $($_.Exception.Message))" -EntryType Error
             Start-Sleep -Seconds (2 * $retryCount)
         }
     }
 
     if (-not $completed) { 
-        Write-EventLog -Message "Failed to download file from $SourceUrl" -EntryType Error
+        Write-EventLog -Message "Failed to download file from $SourceUrl." -EntryType Error
+        throw "Failed to download file from $SourceUrl."
     } 
 
     else {
-        Write-EventLog -Message "Download of $SourceUrl completed successfully" -EntryType Information
+        Write-EventLog -Message "Download of $SourceUrl completed successfully." -EntryType Information
     }
 }
 

@@ -5,6 +5,60 @@ param (
     [Parameter(Mandatory = $true)] [string] $AdminPass
 )
 
+# Function to download a file from a URL, retrying if necessary.
+Function Get-WebResourcesWithRetries {
+    param (
+        [Parameter(Mandatory = $true)] [string] $SourceUrl,
+        [Parameter(Mandatory = $true)] [string] $DestinationPath,
+        [Parameter(Mandatory = $false)] [int] $MaxRetries = 5,
+        [Parameter(Mandatory = $false)] [int] $RetryIntervalSeconds = 1
+    )
+
+    $retryCount = 0
+    $completed = $false
+    $response = $null
+
+    while (-not $completed -and $retryCount -lt $MaxRetries) {
+        try {
+            $fileExists = Test-Path $DestinationPath
+            $headers = @{}
+
+            if ($fileExists) {
+                $fileLength = (Get-Item $DestinationPath).Length
+                $headers["Range"] = "bytes=$fileLength-"
+            }
+
+            $response = Invoke-WebRequest -Uri $SourceUrl `
+                -Headers $headers `
+                -OutFile $DestinationPath `
+                -UseBasicParsing `
+                -PassThru `
+                -ErrorAction Stop
+
+            if ($response.StatusCode -eq 206 -or $response.StatusCode -eq 200) { 
+                $completed = $true 
+            }
+            else { 
+                $retryCount++ 
+            }
+        }
+        catch {
+            $retryCount++
+            Write-EventLog -Message "Failed to download file from $SourceUrl. Retrying in $RetryIntervalSeconds seconds. Retry count: $retryCount" -EntryType Warning
+            Start-Sleep -Seconds (2 * $retryCount)
+        }
+    }
+
+    if (-not $completed) { 
+        Write-EventLog -Message "Failed to download file from $SourceUrl" -EntryType Error
+        throw "Failed to download file from $SourceUrl"
+    } 
+
+    else {
+        Write-EventLog -Message "Download of $SourceUrl completed successfully" -EntryType Information
+    }
+}
+
 # Function to simplify the creation of an event log entry.
 Function Write-EventLog {
     param(
@@ -73,6 +127,18 @@ while ($retries -lt $MaxRetries) {
         Test-NetConnection -ComputerName $DomainName
         Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -EntryType Information
         
+        try {
+            
+        $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
+        $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
+        $script = Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content | Out-File -FilePath $scriptPath -Encoding ASCII
+        Write-EventLog -Message "Downloaded script $scriptPath" -EntryType Information
+        } catch {
+            Write-EventLog -Message "Failed to download script $scriptPath" -EntryType Error
+        }
+
+
+
         # Join domain
         Write-EventLog -Message "Joining domain $DomainName" -EntryType Information
         try {

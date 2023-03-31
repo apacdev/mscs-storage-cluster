@@ -33,10 +33,10 @@
       "value": "mscswvm-01"
     },
     "vm_02_name": {
-      "value": "mscswvm-02"
+      "value": "mscswvm-node-02"
     },
     "vm_03_name": {
-      "value": "mscswvm-03"
+      "value": "mscswvm-node-03"
     },
     "vm_01_role": {
       "value": "ad-domain"
@@ -46,6 +46,12 @@
     },
     "vm_03_role": {
       "value": "cluster-node"
+    },
+    "ilb_ip_addr": {
+      "value": "172.16.1.50"
+    },
+    "ilb_name": {
+      "value": "mscs-ilb"
     },
     "iip_v4_01_addr": {
       "value": "172.16.0.100"
@@ -130,6 +136,12 @@
     },
     "storage_account_name": {
       "value": "mscskrcommonstoragespace"
+    },
+    "cluster_name": {
+      "value": "mscs-cluster"
+    },
+    "cluster_ip": {
+      "value": "172.16.1.50"
     }
   }
 }

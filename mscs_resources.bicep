@@ -1,4 +1,5 @@
 targetScope = 'subscription'
+
 // ************************************************************************************************
 // Role: Azure Bicep Template for Microsoft Cluster Services (MSCS) on Windows Server 2022
 // Author:  Patrick Shim (patrick.shim@live.co.kr)
@@ -20,6 +21,7 @@ param admin_password string
   'mscs_storage_resources'
   'mscs_common_resources'
 ])
+
 param mscs_network_resources_name string = 'mscs_network_resources'
 param mscs_storage_resources_name string = 'mscs_storage_resources'
 param mscs_compute_resources_name string = 'mscs_compute_resources'
@@ -47,10 +49,10 @@ param disk_name string = 'mscs-asd-clusterdisk'
 param vm_01_name string = 'mscswvm-01'
 
 @description('Name of the VM-02.')
-param vm_02_name string = 'mscswvm-02'
+param vm_02_name string = 'mscswvm-node-02'
 
 @description('Name of the VM-03.')
-param vm_03_name string = 'mscswvm-03'
+param vm_03_name string = 'mscswvm-node-03'
 
 @description('Role of the VM-01.')
 param vm_01_role string = 'ad-domain'
@@ -60,6 +62,12 @@ param vm_02_role string = 'cluster-node'
 
 @description('Role of the VM-03.')
 param vm_03_role string = 'cluster-node'
+
+@description('IP for Cluster and Load Balancer.')
+param ilb_ip_addr string = '172.16.1.50'
+
+@description('Name of Internal Loadbalancer.')
+param ilb_name string = 'mscs-ilb'
 
 @description('Internal IP address for the VM-01.')
 param iip_v4_01_addr string = '172.16.0.100'
@@ -152,6 +160,9 @@ param vm_size string = 'Standard_F4s_v2'
 @maxLength(24)
 param storage_account_name string = 'mscskrcommonstoragespace'
 
+param cluster_name string = 'mscs-cluster'
+param cluster_ip string = '172.16.0.50'
+
 // create resource group for network resources
 resource mscs_network_resources 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: mscs_network_resources_name
@@ -227,6 +238,9 @@ module vnet_resources 'mscs_network_module.bicep' = {
     eip_v4_01_name: eip_v4_01_name
     eip_v4_02_name: eip_v4_02_name
     eip_v4_03_name: eip_v4_03_name
+
+    // load balancer
+    ilb_name: ilb_name
   }
   scope: mscs_network_resources
 }
@@ -252,17 +266,17 @@ module compute_resources 'mscs_compute_module.bicep' = {
   name: 'mscs_compute_module'
   params: {
     location: mscs_compute_resources.location
-    storage_account_name: storage_account_name
-
-    disk_name: disk_name
-
+    
     vm_01_name: vm_01_name
     vm_02_name: vm_02_name
     vm_03_name: vm_03_name
 
+    disk_name: disk_name
+
     mscs_network_resources_name: mscs_network_resources_name
     mscs_storage_resources_name: mscs_storage_resources_name
     mscs_common_resources_name: mscs_common_resources_name
+    storage_account_name: storage_account_name
 
     nic_vm_01_name: nic_01_name
     nic_vm_02_name: nic_02_name
@@ -294,13 +308,16 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     vm_01_role: vm_01_role
     vm_02_role: vm_02_role
     vm_03_role: vm_03_role
-    iipv4_01_address: iip_v4_01_addr
     iipv4_02_address: iip_v4_02_addr
     iipv4_03_address: iip_v4_03_addr
     domain_name: domain_name
     domain_netbios_name: domain_netbios_name
     domain_server_ip: domain_server_ip
     resource_group_name: mscs_compute_resources_name
+    storage_account_name: storage_account_name
+    cluster_name: cluster_name
+    cluster_ip: cluster_ip
+    mscs_common_resources_name: mscs_common_resources_name
   }
   dependsOn: [
     compute_resources

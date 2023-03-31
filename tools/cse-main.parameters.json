@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "admin_name": {
+      "value": "pashim"
+    },
+    "vm_01_name": {
+      "value": "mscswvm-01"
+    },
+    "vm_02_name": {
+      "value": "mscswvm-02"
+    },
+    "vm_03_name": {
+      "value": "mscswvm-03"
+    },
+    "vm_01_role": {
+      "value": "ad-domain"
+    },
+    "vm_02_role": {
+      "value": "cluster-node"
+    },
+    "vm_03_role": {
+      "value": "cluster-node"
+    },
+    "iip_v4_01_addr": {
+      "value": "172.16.0.100"
+    },
+    "iip_v4_02_addr": {
+      "value": "172.16.1.101"
+    },
+    "iip_v4_03_addr": {
+      "value": "172.16.1.102"
+    },
+    "domain_name": {
+      "value": "neostation.org"
+    },
+    "domain_netbios_name": {
+      "value": "NEOSTATION"
+    },
+    "domain_server_ip": {
+      "value": "172.16.0.100"
+    },
+    "storage_account_name": {
+      "value": "mscskrcommonstoragespace"
+    },
+    "mscs_compute_resources_name": {
+      "value": "mscs_compute_resources"
+    },
+    "mscs_common_resources_name": {
+      "value": "mscs_common_resources"
+    }
+  }
+}

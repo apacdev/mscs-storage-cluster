@@ -73,7 +73,7 @@ Function Set-MscsFailoverCluster {
         }
         try {
             Write-EventLog -Message "Creating a new failover cluster named $ClusterName"
-            New-Cluster -Name $ClusterName -Node $nodes -StaticAddress $ClusterIpAddress -NoStorage
+            New-Cluster -Name $ClusterName -Node @($nodes) -StaticAddress $ClusterIpAddress -NoStorage
         }
         catch {
             Write-EventLog -Message "Failed to create a new failover cluster named $ClusterName" -EntryType [System.Diagnostics.EventLogEntryType]::Error
@@ -91,8 +91,8 @@ Function Set-MscsFailoverClusterQuorum {
     )
     try {
         # set up a cloud witness using a storage account
-        Set-ClusterQuorum -CloudWitness -AccountName $StorageAccountName -AccessKey $StorageAccountKey -Cluster $ClusterName
-        Write-EventLog -Message "Set-MscsFailoverClusterQuorum: Set-ClusterQuorum -CloudWitness -AccountName $StorageAccountName -AccessKey $StorageAccountKey -Cluster $ClusterName"
+        Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey "gWEM2lBOv9nbzg50jN5UQTkCGhMeN/mVe+p9aadHkhNajFwLvMocRH/0dqwLxDiJBDwYVef9oudU+ASt8L5jrQ==" -Cluster $ClusterName 
+        Write-EventLog -Message "Set-MscsFailoverClusterQuorum: Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey 'gWEM2lBOv9nbzg50jN5UQTkCGhMeN/mVe+p9aadHkhNajFwLvMocRH/0dqwLxDiJBDwYVef9oudU+ASt8L5jrQ==' -Cluster $ClusterName"
     }
     catch {
         Write-EventLog -Message "Set-MscsFailoverClusterQuorum: $_.Exception.Message" -EntryType [System.Diagnostics.EventLogEntryType]::Error

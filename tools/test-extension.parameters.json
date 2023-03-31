@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "admin_name": {
+      "value": "pashim"
+    },
+    "location": {
+      "value": "koreacentral"
+    },
+    "domain_name": {
+      "value": "neostation.org"
+    },
+    "domain_netbios_name": {
+      "value": "NEOSTATION"
+    },
+    "domain_server_ip": {
+      "value": "172.16.0.100"
+    },
+    "vm_01_role": {
+      "value": "ad-domain"
+    },
+    "vm_02_role": {
+      "value": "cluster-node"
+    },
+    "vm_03_role": {
+      "value": "cluster-node"
+    },
+    "vm_01_name": {
+      "value": "mscswvm-01"
+    },
+    "vm_02_name": {
+      "value": "mscswvm-02"
+    },
+    "vm_03_name": {
+      "value": "mscswvm-03"
+    },
+    "ii_v4_01_address": {
+      "value": "172.16.0.100"
+    },
+    "iipv4_02_address": {
+      "value": "172.16.1.101"
+    },
+    "iipv4_03_address": {
+      "value": "172.16.1.102"
+    },
+    "resource_group_name": {
+      "value": "mscs_compute_resources"
+    }
+  }
+}
