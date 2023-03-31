@@ -1,0 +1,37 @@
+# $nodeList = @("mscswvm-node-02", "172.16.1.101"), @("mscswvm-node-03", "172.16.1.102")
+# $clusterIpAddress = "172.16.1.50"
+# $asdFriendlyName = "Msft Virtual Disk"
+# $asdVolumeName = "cluster-shared-volume"
+#$ storageAccountName = "mscskrcommonstoragespace"
+# $storageAccountKey = "BD5ePqIHLZ4yuu57TjocxCH4JCW6LlPY36PpDpdl+JZI8tUPwI4M/r0Afmc13tHkzrivtMvpS9a3+AStT7qcMg=="
+
+Get-ClusterResource
+
+$clusterNetworkName = "mscs-cluster-net"
+$IpResourceName = "IP Address 172.16.1.0"
+$IpAddress = "172.16.1.50"
+$ProbePort = 61800
+
+Get-ClusterResource $IpResourceName | Set-ClusterParameter -Multiple @{"Address" = $IpAddress; "ProbePort"="61800";"Network"="Cluster Network 1";"SubnetMask"="255.255.255.255";"EnableDhcp"=0}
+
+
+Get-ClusterResource  -Verbose
+
+Get-ClusterResource | Where-Object {$_.Name.StartsWith("Cluster IP Address")}
+
+
+ $t =Get-ClusterGroup -Name "Cluster Group"
+ $t.GetType()
+
+ # Define variables
+$ClusterNetworkName = "Cluster Network 1"
+# the cluster network name
+$IPResourceName = "SQL IP Address 1 (SQLCluster1)"
+# the IP Address resource name
+$CloudServiceIP = "10.0.0.201"
+# IP address of your Internal Load Balancer
+Import-Module FailoverClusters
+# If you are using Windows 2012 or higher, use the Get-Cluster Resource command. If you are using Windows 2008 R2, use the cluster res command which is commented out.
+Get-ClusterResource $IPResourceName
+Set-ClusterParameter -Multiple @{"Address"="$CloudServiceIP";"ProbePort"="59999";SubnetMask="255.255.255.255";"Network"="$ClusterNetworkName";"OverrideAddressMatch"=1;"EnableDhcp"=0}
+# cluster res $IPResourceName /priv enabledhcp=0 overrideaddressmatch=1 address=$CloudServiceIP probeport=59999 subnetmask=255.255.255.255

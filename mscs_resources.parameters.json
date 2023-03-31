@@ -1,0 +1,147 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "admin_name": {
+      "value": "pashim"
+    },
+    "mscs_network_resources_name": {
+      "value": "mscs_network_resources"
+    },
+    "mscs_storage_resources_name": {
+      "value": "mscs_storage_resources"
+    },
+    "mscs_compute_resources_name": {
+      "value": "mscs_compute_resources"
+    },
+    "mscs_common_resources_name": {
+      "value": "mscs_common_resources"
+    },
+    "location": {
+      "value": "koreacentral"
+    },
+    "log_space_name": {
+      "value": "mscs-log-workspace"
+    },
+    "automate_name": {
+      "value": "mscs-vms-automate"
+    },
+    "disk_name": {
+      "value": "mscs-asd-clusterdisk"
+    },
+    "vm_01_name": {
+      "value": "mscswvm-01"
+    },
+    "vm_02_name": {
+      "value": "mscswvm-node-02"
+    },
+    "vm_03_name": {
+      "value": "mscswvm-node-03"
+    },
+    "vm_01_role": {
+      "value": "ad-domain"
+    },
+    "vm_02_role": {
+      "value": "cluster-node"
+    },
+    "vm_03_role": {
+      "value": "cluster-node"
+    },
+    "ilb_ip_addr": {
+      "value": "172.16.1.50"
+    },
+    "ilb_name": {
+      "value": "mscs-ilb"
+    },
+    "iip_v4_01_addr": {
+      "value": "172.16.0.100"
+    },
+    "iip_v4_02_addr": {
+      "value": "172.16.1.101"
+    },
+    "iip_v4_03_addr": {
+      "value": "172.16.1.102"
+    },
+    "vnet_ipv4_addr": {
+      "value": "172.16.0.0/16"
+    },
+    "vnet_ipv6_addr": {
+      "value": "fd00:db8:deca::/48"
+    },
+    "subnet_v4_01_addr": {
+      "value": "172.16.0.0/24"
+    },
+    "subnet_v4_02_addr": {
+      "value": "172.16.1.0/24"
+    },
+    "subnet_v6_01_addr": {
+      "value": "fd00:db8:deca:deec::/64"
+    },
+    "subnet_v6_02_addr": {
+      "value": "fd00:db8:deca:deed::/64"
+    },
+    "domain_name": {
+      "value": "neostation.org"
+    },
+    "domain_netbios_name": {
+      "value": "NEOSTATION"
+    },
+    "domain_server_ip": {
+      "value": "172.16.0.100"
+    },
+    "nsg_name": {
+      "value": "mscs-nsg"
+    },
+    "vnet_name": {
+      "value": "mscs-vnet"
+    },
+    "subnet_01_name": {
+      "value": "subnet_01"
+    },
+    "subnet_02_name": {
+      "value": "subnet_02"
+    },
+    "nic_01_name": {
+      "value": "nic_vm_01"
+    },
+    "nic_02_name": {
+      "value": "nic_vm_02"
+    },
+    "nic_03_name": {
+      "value": "nic_vm_03"
+    },
+    "eip_v4_01_name": {
+      "value": "eip_v4_01"
+    },
+    "eip_v4_02_name": {
+      "value": "eip_v4_02"
+    },
+    "eip_v4_03_name": {
+      "value": "eip_v4_03"
+    },
+    "eip_v6_01_name": {
+      "value": "eip_v6_01"
+    },
+    "eip_v6_02_name": {
+      "value": "eip_v6_02"
+    },
+    "eip_v6_03_name": {
+      "value": "eip_v6_03"
+    },
+    "log_space_sku": {
+      "value": "PerGB2018"
+    },
+    "vm_size": {
+      "value": "Standard_F4s_v2"
+    },
+    "storage_account_name": {
+      "value": "mscskrcommonstoragespace"
+    },
+    "cluster_name": {
+      "value": "mscs-cluster"
+    },
+    "cluster_ip": {
+      "value": "172.16.1.50"
+    }
+  }
+}
