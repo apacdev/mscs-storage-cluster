@@ -128,17 +128,14 @@ while ($retries -lt $MaxRetries) {
         Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -EntryType Information
         
         try {
-            
-        $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
-        $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
-        $script = Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content | Out-File -FilePath $scriptPath -Encoding ASCII
-        Write-EventLog -Message "Downloaded script $scriptPath" -EntryType Information
+            $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
+            $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
+            $script = Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content | Out-File -FilePath $scriptPath -Encoding ASCII
+            Write-EventLog -Message "Downloaded script $scriptPath" -EntryType Information
         } catch {
             Write-EventLog -Message "Failed to download script $scriptPath" -EntryType Error
         }
-
-
-
+        
         # Join domain
         Write-EventLog -Message "Joining domain $DomainName" -EntryType Information
         try {

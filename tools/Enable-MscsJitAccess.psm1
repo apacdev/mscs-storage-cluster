@@ -59,9 +59,10 @@ Function Request-MscsJitNetworkAccess {
 }
 
 
-if ($null -eq ($context)) { 
-    Connect-AzAccount -UseDeviceAuthentication 
+if ($null -eq (Get-AzContext)) { 
+    Connect-AzAccount
 }
 
+$ResourceGroup = "mscs_compute_resources"
 Enable-MscsJitNetworkAccess -ResourceGroupName $ResourceGroup 
 Request-MscsJitNetworkAccess -ResourceGroup $ResourceGroup
