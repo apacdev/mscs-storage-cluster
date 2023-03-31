@@ -91,8 +91,8 @@ Function Set-MscsFailoverClusterQuorum {
     )
     try {
         # set up a cloud witness using a storage account
-        Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey "gWEM2lBOv9nbzg50jN5UQTkCGhMeN/mVe+p9aadHkhNajFwLvMocRH/0dqwLxDiJBDwYVef9oudU+ASt8L5jrQ==" -Cluster $ClusterName 
-        Write-EventLog -Message "Set-MscsFailoverClusterQuorum: Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey 'gWEM2lBOv9nbzg50jN5UQTkCGhMeN/mVe+p9aadHkhNajFwLvMocRH/0dqwLxDiJBDwYVef9oudU+ASt8L5jrQ==' -Cluster $ClusterName"
+        Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey $StorageAccountKey -Cluster $ClusterName 
+        Write-EventLog -Message "Set-MscsFailoverClusterQuorum: Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey '$StorageAccountKey' -Cluster $ClusterName"
     }
     catch {
         Write-EventLog -Message "Set-MscsFailoverClusterQuorum: $_.Exception.Message" -EntryType [System.Diagnostics.EventLogEntryType]::Error
@@ -138,7 +138,7 @@ Function Set-MscsClusterSharedVolume {
             else {
                 Write-EventLog -Message "Set-MscsClusterSharedVolume: Disk $DiskFriendlyName is already partitioned. Skipping partitioning."
             }
-                        
+           
         }
     }
     catch {

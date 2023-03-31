@@ -30,7 +30,7 @@
       "value": "mscs-asd-clusterdisk"
     },
     "vm_01_name": {
-      "value": "mscswvm-01"
+      "value": "mscswvm-dns-01"
     },
     "vm_02_name": {
       "value": "mscswvm-node-02"
@@ -141,7 +141,7 @@
       "value": "mscs-cluster"
     },
     "cluster_ip": {
-      "value": "172.16.1.50"
+      "value": "172.16.0.100"
     }
   }
 }
