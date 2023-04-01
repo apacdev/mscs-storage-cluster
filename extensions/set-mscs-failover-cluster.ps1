@@ -1,12 +1,59 @@
-[CmdletBinding()]
-param(
-    [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $ClusterIpAddress,
-    [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $DomainName,
-    [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $StorageAccountName,
-    [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $StorageAccountKey,
-    [Parameter(Mandatory = $true)]  [string] [ValidateNotNullOrEmpty()] $ClusterName,
-    [Parameter(Mandatory = $false)] [array] [ValidateNotNullOrEmpty()] $NodeList
-)
+<#
+.SYNOPSIS
+Short description
+
+.DESCRIPTION
+Long description
+
+.PARAMETER Message
+Parameter description
+
+.PARAMETER Source
+Parameter description
+
+.PARAMETER EventLogName
+Parameter description
+
+.PARAMETER EntryType
+Parameter description
+
+.EXAMPLE
+An example
+
+.NOTES
+General notes
+#>
+
+# A function to read c:\temp\parameters.json 
+Function Read-ParametersJson {
+    param(
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ParameterPath
+    )
+    # read parameters.json file and convert to object.  throw an error if the file is not found, or return the object.
+    if (-not (Test-Path $ParameterPath)) { 
+        throw "File not found: $ParameterPath."
+        break
+    } else {
+        return (Get-Content $ParameterPath | ConvertFrom-Json)
+    }
+}
+
+# populate variables from parameters.json
+$parameters = Read-ParametersJson -ParameterPath "C:\\Temp\\parameters.json"
+$domainName = $parameters.domainName
+$domainServerIpAddress = $parameters.domainServerIpAddress
+$AdminName = $parameters.AdminName
+$Secret = $parameters.AdminPass
+$ClusterIpAddress = $parameters.ClusterIpAddress
+$ClusterName = $parameters.ClusterName
+$StorageAccountName = $parameters.StorageAccountName
+$StorageAccountKey = $parameters.StorageAccountKey
+
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret' -ClusterIpAddress $ClusterIpAddress -ClusterName '$ClusterName' -StorageAccount '$StorageAccountName' -StorageAccountKey '$StorageAccountKey'`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
+
 
 Function Write-EventLog {
     param(
@@ -15,7 +62,7 @@ Function Write-EventLog {
         [Parameter(Mandatory = $false)] [string] [ValidateNotNullOrEmpty()] [string] $EventLogName = "Application",
         [Parameter(Mandatory = $false)] [System.Diagnostics.EventLogEntryType] [ValidateNotNullOrEmpty()] $EntryType = [System.Diagnostics.EventLogEntryType]::Information
     )
-    
+
     # Check whether the event source exists, and create it if it doesn't exist.
     if (-not [System.Diagnostics.EventLog]::SourceExists($Source)) { [System.Diagnostics.EventLog]::CreateEventSource($Source, $EventLogName) }
 
@@ -46,57 +93,6 @@ Function Write-EventLog {
         Write-Host "Failed to write log entry to file: $($_.Exception.Message)"
         Write-Error "Failed to write log entry to file: $($_.Exception.Message)"
         thorw $_.Exception
-    }
-}
-
-Function Set-MscsFailoverCluster {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterIpAddress,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainName,
-        [Parameter(Mandatory = $false)] [string] [ValidateNotNullOrEmpty()] $ClusterName = "mscs-cluster",
-        [Parameter(Mandatory = $false)] [array] [ValidateNotNullOrEmpty()] $NodeList = @("mscswvm-node-01", "mscswvm-node-02")
-    )
-    $nodes = @()
-    if ($null -eq ((Get-Cluster -Name $ClusterName -ErrorAction SilentlyContinue))) {
-        Write-EventLog -Message "Creating a new failover cluster named $ClusterName"
-
-        if (($NodeList.Count -eq 0) -or ($null -eq $NodeList)) {
-            Write-EventLog -Message "No node list is provided. Using all nodes in the domain."
-            $nodes = Get-ADComputer -Filter { Name -like "*node*" } | Select-Object -ExpandProperty DNSHostName 
-
-        }
-        else {
-            foreach ($node in $NodeList) {
-                $nodes += ("$($node[0]).$DomainName")
-            }
-        }
-        try {
-            Write-EventLog -Message "Creating a new failover cluster named $ClusterName"
-            New-Cluster -Name $ClusterName -Node @($nodes) -StaticAddress $ClusterIpAddress -NoStorage
-        }
-        catch {
-            Write-EventLog -Message "Failed to create a new failover cluster named $ClusterName" -EntryType [System.Diagnostics.EventLogEntryType]::Error
-            Write-Error $_.Exception.Message
-            throw $_.Exception
-        }
-    }
-}
-Function Set-MscsFailoverClusterQuorum {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $StorageAccountName,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $StorageAccountKey,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterName
-    )
-    try {
-        # set up a cloud witness using a storage account
-        Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey $StorageAccountKey -Cluster $ClusterName 
-        Write-EventLog -Message "Set-MscsFailoverClusterQuorum: Set-ClusterQuorum -CloudWitness -AccountName csukrcconsistentstorage -AccessKey '$StorageAccountKey' -Cluster $ClusterName"
-    }
-    catch {
-        Write-EventLog -Message "Set-MscsFailoverClusterQuorum: $_.Exception.Message" -EntryType [System.Diagnostics.EventLogEntryType]::Error
-        throw $_.Exception
     }
 }
 
@@ -138,7 +134,6 @@ Function Set-MscsClusterSharedVolume {
             else {
                 Write-EventLog -Message "Set-MscsClusterSharedVolume: Disk $DiskFriendlyName is already partitioned. Skipping partitioning."
             }
-           
         }
     }
     catch {
@@ -146,12 +141,20 @@ Function Set-MscsClusterSharedVolume {
         throw $_.Exception
     }
 }
+#
+$expectedNodeCount = 1
+$localName = $env:COMPUTERNAME
+$nodes = @(Get-ADComputer -Filter { Name -like "*node*" } | Select-Object -ExpandProperty DNSHostName)
 
-try {
-    Set-MscsFailoverCluster -ClusterName $ClusterName -ClusterIpAddress $ClusterIpAddress -DomainName $DomainName
-    Set-MscsFailoverClusterQuorum -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey -ClusterName $ClusterName
-    Set-MscsClusterSharedVolume -ClusterName $ClusterName -DiskFriendlyName "Msft Virtual Disk"
+if ($nodes.Count -ge $expectedNodeCount) {
+    $components = ((($nodes[0]).Split('.'))[0])
+    if ($components.Equals($localName)) {
+        Write-EventLog -Message "Creating a new failover cluster named $ClusterName"
+        New-Cluster -Name $ClusterName -Node @($nodes) -StaticAddress $ClusterIpAddress -NoStorage
+        Set-ClusterQuorum -CloudWitness -AccountName $StorageAccountName -AccessKey $StorageAccountKey -Cluster $ClusterName 
+        Set-MscsClusterSharedVolume -ClusterName $ClusterName
+    }  
 }
-catch {
-    throw $_.Exception
+else {
+    Write-Host "At least 2 or more nodes are required to form a cluster."    
 }

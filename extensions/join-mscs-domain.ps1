@@ -2,7 +2,11 @@ param (
     [Parameter(Mandatory = $true)] [string] $DomainName,
     [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
     [Parameter(Mandatory = $true)] [string] $AdminName,
-    [Parameter(Mandatory = $true)] [string] $AdminPass
+    [Parameter(Mandatory = $true)] [string] $AdminPass,
+    [Parameter(Mandatory = $true)] [string] $ClusterIpAddress, 
+    [Parameter(Mandatory = $true)] [string] $ClusterName,
+    [Parameter(Mandatory = $true)] [string] $StorageAccountName,
+    [Parameter(Mandatory = $true)] [string] $StorageAccountKey
 )
 
 # Function to download a file from a URL, retrying if necessary.
@@ -130,10 +134,20 @@ while ($retries -lt $MaxRetries) {
         try {
             $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
             $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
-            $script = Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content | Out-File -FilePath $scriptPath -Encoding ASCII
+            
+            $parameterPath = "C:\\Temp\\parameters.json"
+            @{
+                "DomainName" = $DomainName
+                "ClusterName" = $ClusterName
+                "ClusterIpAddress" = $ClusterIpAddress
+                "StorageAccountName" = $StorageAccountName
+                "StorageAccountKey" = $StorageAccountKey
+            } | ConvertTo-Json | Out-File -FilePath $parameterPath -Encoding ASCII
+
+            Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content | Out-File -FilePath $scriptPath -Encoding ASCII
             Write-EventLog -Message "Downloaded script $scriptPath" -EntryType Information
         } catch {
-            Write-EventLog -Message "Failed to download script $scriptPath" -EntryType Error
+            Write-EventLog -Message "Failed to download script to join machines to domain $scriptPath" -EntryType Error
         }
         
         # Join domain
