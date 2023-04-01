@@ -538,11 +538,22 @@ try {
         
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
-
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret'`""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret' -ClusterIpAddress $ClusterIpAddress -ClusterName '$ClusterName' -StorageAccount '$StorageAccountName' -StorageAccountKey '$StorageAccountKey'`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
+        
+        
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainName,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainNetBiosName,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainServerIpAddress,
+        [Parameter(Mandatory = $true)] [array]  [ValidateNotNullOrEmpty()] $NodeList,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaName,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaKey,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterName,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterIp
+
+
         
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
         Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
