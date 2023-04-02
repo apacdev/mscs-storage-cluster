@@ -1,5 +1,5 @@
 param (
-    [Parameter(Mandatory = $true)] [string] $VmParametersJson
+    [Parameter(Mandatory = $true)] [string] $Variables
 )
 
 # Function to download a file from a URL, retrying if necessary.
@@ -98,36 +98,33 @@ Function Write-EventLog {
 }
 
 # Parse the VM parameters JSON.
-$vmParameters = ConvertFrom-Json $VmParametersJson
-
-# Display the VM parameters.
-Write-EventLog -Message "Starting Windows VM Custom Script Extension" -EntryType Information
-Write-EventLog -Message "Parameters: $vmParameters" -EntryType Information
+# $Variables = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
+$values = ConvertFrom-Json -InputObject $Variables
 
 # Extract the VM parameters for this script to run
-$AdminName = $vmParameters.admin_name
-$AdminPass = $vmParameters.admin_password
-$DomainName = $vmParameters.domain_name
-$DomainServerIpAddress = $vmParameters.domain_server_ip
+$AdminName = $values.admin_name
+$Secret = $values.admin_password
+$DomainName = $values.domain_name
+$DomainServerIpAddress = $values.domain_server_ip
 
-##############################################################################################################
+#######################################################################################################
 # Join the VM to the domain
 ##############################################################################################################
 
-$MaxRetries = 30
-$RetryIntervalSeconds = 1
-$TargetDns = "www.google.com"
-$Credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $AdminPass -AsPlainText -Force))
+$maxRetries = 30
+$retryIntervalSeconds = 1
+$tragetDnsFqdn = "www.google.com"
+$credential = New-Object System.Management.Automation.PSCredential($AdminName, (ConvertTo-SecureString -String $Secret -AsPlainText -Force))
 
 Write-EventLog -Message "Joining domain $DomainName..." -EntryType Information
 # Wait for network connectivity to the domain server
 
 $retries = 0
 
-while ($retries -lt $MaxRetries) {
+while ($retries -lt $maxRetries) {
     if ( $true -ne (Test-NetConnection -ComputerName $DomainServerIpAddress -Port 389)) {
-        Write-EventLog -Message "Network connection to domain controller $DomainServerIpAddress cannot be reached. Retrying in $RetryIntervalSeconds seconds." -EntryType Information
-        Start-Sleep -Seconds $RetryIntervalSeconds
+        Write-EventLog -Message "Network connection to domain controller $DomainServerIpAddress cannot be reached. Retrying in $retryIntervalSeconds seconds." -EntryType Information
+        Start-Sleep -Seconds $retryIntervalSeconds
         $retries++
     }
     else {
@@ -135,8 +132,8 @@ while ($retries -lt $MaxRetries) {
         Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
         Clear-DnsClientCache
         
-        Test-NetConnection -ComputerName $TargetDns
-        Write-EventLog -Message "Network connectivity to $TargetDns is OK."
+        Test-NetConnection -ComputerName $tragetDnsFqdn
+        Write-EventLog -Message "Network connectivity to $tragetDnsFqdn is OK."
 
         Test-NetConnection -ComputerName $DomainName
         Write-EventLog -Message "Network connectivity to domain controller by FQDN ($DomainName) is OK." -EntryType Information
@@ -144,14 +141,14 @@ while ($retries -lt $MaxRetries) {
         # download and store the post-config script for the scheduled task to run after joining the domain reboot
         $scriptUrl = "https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
         $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
-        $parameterPath = "C:\\Temp\\parameters.json"
-        $VmParametersJson | Out-File -FilePath $parameterPath -Encoding ASCII
+        $parameterPath = "C:\\Temp\\variables.json"
+        $values | Out-File -FilePath $parameterPath -Encoding ASCII
         
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 10 -RetryIntervalSeconds 1
         Write-EventLog -Message "Downloaded script to run after reboot (task schedule) $scriptPath" -EntryType Information
 
         # Register a task to run once after reboot
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath'`" -VmParametersJson '$parameterPath'"
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath'`" -Variables '$parameterPath'"
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
@@ -164,9 +161,9 @@ while ($retries -lt $MaxRetries) {
 
         try {
             Add-Computer -ComputerName $env:COMPUTERNAME `
-                -LocalCredential $Credential `
+                -LocalCredential $credential `
                 -DomainName $DomainName `
-                -Credential $Credential `
+                -Credential $credential `
                 -Restart `
                 -Force
 
@@ -174,8 +171,8 @@ while ($retries -lt $MaxRetries) {
             break
         }
         catch {
-            Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $RetryIntervalSeconds seconds." -EntryType Error
-            Start-Sleep -Seconds $RetryIntervalSeconds
+            Write-EventLog -Message "Failed to join domain $DomainName. Retrying in $retryIntervalSeconds seconds." -EntryType Error
+            Start-Sleep -Seconds $retryIntervalSeconds
             $retries++
         }
     }

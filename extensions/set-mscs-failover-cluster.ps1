@@ -1,3 +1,6 @@
+param(
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Variables
+)
 # A function to simplify Event Log creation and writing.
 Function Write-EventLog {
     param(
@@ -110,22 +113,25 @@ Function Read-ParametersJson {
     }
 }
 
+# $Variables = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
+# $values = ConvertFrom-Json -InputObject $Variables
 # populate variables from parameters.json
-$parameters = Read-ParametersJson -ParameterPath "C:\\Temp\\parameters.json"
-$domainName = $parameters.domainName
-$domainServerIpAddress = $parameters.domainServerIpAddress
-$AdminName = $parameters.AdminName
-$Secret = $parameters.AdminPass
-$ClusterIpAddress = $parameters.ClusterIpAddress
-$ClusterName = $parameters.ClusterName
-$StorageAccountName = $parameters.StorageAccountName
-$StorageAccountKey = $parameters.StorageAccountKey
-$ClusterNetworkName = $parameters.ClusterNetworkName
-$ClusterRoleIpAddress = $parameters.ClusterRoleIpAddress
-$ProbePort = $parameters.ProbePort
+$values = Read-ParametersJson -ParameterPath "C:\\Temp\\variables.json"
 
+$AdminName = $values.admin_name
+$AdminPassword = $values.admin_password
+$DomainName = $values.domain_name
+$DomainNetbiosName = $values.domain_netbios_name
+$DomainServerIp = $values.domain_server_ip
+$ClusterName = $values.cluster_name
+$ClusterIpAddress = $values.cluster_ip
+$ClusterRoleIp = $values.cluster_role_ip
+$ClusterNetworkName = $values.cluster_network_name
+$ClusterProbePort = $values.cluster_probe_port
+$StorageAccountName = $values.sa_name
+$StorageAccountKey = $values.sa_key
 
-$expectedNodeCount = 1
+$expectedNodeCount = 2
 $localName = $env:COMPUTERNAME
 $nodes = @(Get-ADComputer -Filter { Name -like "*node*" } | Select-Object -ExpandProperty DNSHostName)
 
