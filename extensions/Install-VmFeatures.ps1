@@ -81,33 +81,6 @@ param(
     [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterIp
 )
 
-Write-Output "ResourceGroupName: $ResourceGroupName"
-Write-Output "VmRole: $VmRole"
-Write-Output "VmName: $VmName"
-Write-Output "AdminName: $AdminName"
-Write-Output "DomainName: $DomainName"
-Write-Output "DomainNetBiosName: $DomainNetBiosName"
-Write-Output "DomainServerIpAddress: $DomainServerIpAddress"
-Write-Output "NodeList: $NodeList"
-Write-Output "SaName: $SaName"
-Write-Output "SaKey: $SaKey"
-Write-Output "ClusterName: $ClusterName"
-Write-Output "ClusterIp: $ClusterIp"
-
-############################################################################################################
-# Variable Definitions
-############################################################################################################
-
-$tempPath = "C:\\Temp"
-$msi = "PowerShell-7.3.2-win-x64.msi"
-$msiPath = "$tempPath\\$msi"
-$powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
-$timeZone = "Singapore Standard Time"
-$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/join-mscs-domain.ps1"
-$scriptPath = "C:\\Temp\\join-mscs-domain.ps1"
-$adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
-$credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
-
 ############################################################################################################
 # Function Definitions
 ############################################################################################################
@@ -506,10 +479,40 @@ Function Set-RequiredFirewallRules {
 # Execution Body
 ############################################################################################################
 
-try {
-        Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." `
-            -EntryType Information
+Write-Output "ResourceGroupName: $ResourceGroupName"
+Write-Output "VmRole: $VmRole"
+Write-Output "VmName: $VmName"
+Write-Output "AdminName: $AdminName"
+Write-Output "DomainName: $DomainName"
+Write-Output "DomainNetBiosName: $DomainNetBiosName"
+Write-Output "DomainServerIpAddress: $DomainServerIpAddress"
+Write-Output "NodeList: $NodeList"
+Write-Output "SaName: $SaName"
+Write-Output "SaKey: $SaKey"
+Write-Output "ClusterName: $ClusterName"
+Write-Output "ClusterIp: $ClusterIp"
+Write-Output "ClusterNetworkName: $ClusterNetworkName"
+Write-Output "ClusterRoleIpAddress: $ClusterRoleIpAddress"
+Write-Output "ProbePort: $ProbePort"
 
+############################################################################################################
+# Variable Definitions
+############################################################################################################
+
+$tempPath = "C:\\Temp"
+$msi = "PowerShell-7.3.2-win-x64.msi"
+$msiPath = "$tempPath\\$msi"
+$powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
+$timeZone = "Singapore Standard Time"
+$scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/join-mscs-domain.ps1"
+$scriptPath = "C:\\Temp\\join-mscs-domain.ps1"
+$adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
+$credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
+
+############################################################################################################
+
+try {
+        Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
         Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
         Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
@@ -535,26 +538,13 @@ try {
         # Install required Windows Features for Failover Cluster and File Server Setup
         Set-RequiredFirewallRules -IsActiveDirectory $false
         Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
-        
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret' -ClusterIpAddress $ClusterIpAddress -ClusterName '$ClusterName' -StorageAccount '$StorageAccountName' -StorageAccountKey '$StorageAccountKey'`""
+        # action: join-mscs-domain.ps1
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret' -ClusterIpAddress $ClusterIpAddress -ClusterName '$ClusterName' -StorageAccount '$StorageAccountName' -StorageAccountKey '$StorageAccountKey' -ClusterNetworkName $ClusterNetworkName -ClusterRoleIpAddress $ClusterRoleIpAddress -ProbePort $ProbePort`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
-        
-        
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainName,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainNetBiosName,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainServerIpAddress,
-        [Parameter(Mandatory = $true)] [array]  [ValidateNotNullOrEmpty()] $NodeList,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaName,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaKey,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterName,
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterIp
-
-
-        
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
         Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
     }
