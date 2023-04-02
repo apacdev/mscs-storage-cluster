@@ -48,20 +48,10 @@ resource storage_account_resource 'Microsoft.Storage/storageAccounts@2022-09-01'
     allowedCopyScope: 'AAD'
     isHnsEnabled: true
     largeFileSharesState: 'Disabled'
-   networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Allow'
-      virtualNetworkRules: [
-        {
-          id: vnet_resource.properties.subnets[0].id
-          action: 'Allow'
-        }
-        {
-          id: vnet_resource.properties.subnets[1].id
-          action: 'Allow'
-        }
-      ]
-   }
+    networkAcls: {
+        bypass: 'AzureServices'
+        defaultAction: 'Allow'
+    }
   }
   dependsOn: [
     vnet_resource
