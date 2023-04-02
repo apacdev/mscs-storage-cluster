@@ -333,7 +333,7 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     cluster_probe_port: cluster_probe_port
 
     storage_account_name: storage_account_name
-    mscs_common_resources_name: mscs_common_resources_name
+    
   }
   dependsOn: [
     compute_resources

@@ -1,6 +1,5 @@
 param(
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Role,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $VmParametersJson
+    [Parameter(Mandatory = $true)] [System.Buffers.Text.Base64] [ValidateNotNullOrEmpty()] $Variables
 )
 
 ############################################################################################################
@@ -400,6 +399,7 @@ Function Set-RequiredFirewallRules {
 ############################################################################################################
 # Execution Body
 ############################################################################################################
+
 <#
 var config_variables  = {
   admin_name: admin_name
@@ -417,7 +417,9 @@ var config_variables  = {
 }
 #>
 
-$vmParameters = ConvertFrom-Json $VmParametersJson
+$argsParam = $args[0]
+$VmVariables = ConvertFrom-Json $Variables
+
 
 Write-EventLog -Message "Starting Windows VM Custom Script Extension" -EntryType Information
 Write-EventLog -Message "Parameters: $vmParameters" -EntryType Information
@@ -470,14 +472,10 @@ try {
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
         
-            Set-ADDomainServices -DomainName $DomainName `
-                -DomainNetBiosName $DomainNetbiosName `
-                -Credential $credential
+            Set-ADDomainServices -DomainName $DomainName -DomainNetBiosName $DomainNetbiosName -Credential $credential
         }
         else {
-            Set-ADDomainServices -DomainName $DomainName `
-                -DomainNetBiosName $DomainNetbiosName `
-                -Credential $credential
+            Set-ADDomainServices -DomainName $DomainName -DomainNetBiosName $DomainNetbiosName -Credential $credential
         }
     }
     else {
@@ -487,7 +485,7 @@ try {
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
         # action: join-mscs-domain.ps1
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -VmParametersJson $VmParametersJson`""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -Variables $VmVariables`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
