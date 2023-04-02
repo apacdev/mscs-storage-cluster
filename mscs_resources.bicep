@@ -34,7 +34,7 @@ param mscs_common_resources_name string  = 'mscs_common_resources'
   'japaneast'
   'koreacentral'
 ])
-param location string = 'southeastasia'
+param location string = 'koreacentral'
 
 @description('Name of LogAnalytics Workspace.')
 param log_space_name string = 'mscs-log-workspace'
@@ -46,7 +46,7 @@ param automate_name string = 'mscs-vms-automate'
 param disk_name string = 'mscs-asd-clusterdisk'
 
 @description('Name of the VM-01.')
-param vm_01_name string = 'mscswvm-01'
+param vm_01_name string = 'mscswvm-adds-01'
 
 @description('Name of the VM-02.')
 param vm_02_name string = 'mscswvm-node-02'
@@ -100,10 +100,10 @@ param subnet_v6_01_addr string = 'fd00:db8:deca:deec::/64'
 param subnet_v6_02_addr string = 'fd00:db8:deca:deed::/64'
 
 @description('Domain Name for Active Directory.')
-param domain_name string = 'contoso.org'
+param domain_name string = 'neostation.org'
 
 @description('NetBIOS name for the Ad Domain.')
-param domain_netbios_name string = 'CONTOSO'
+param domain_netbios_name string = 'NEOSTATION'
 
 @description('Private IP address for the Ad Domain Controller.')
 param domain_server_ip string = '172.16.0.100'
@@ -331,9 +331,8 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     cluster_role_ip: cluster_role_ip
     cluster_network_name: cluster_network_name
     cluster_probe_port: cluster_probe_port
-
+    mscs_common_resources: mscs_common_resources_name
     storage_account_name: storage_account_name
-    
   }
   dependsOn: [
     compute_resources
