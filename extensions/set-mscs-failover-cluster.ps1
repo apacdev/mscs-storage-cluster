@@ -109,14 +109,16 @@ Function Read-ParametersJson {
         break
     }
     else {
-        return (Get-Content $ParameterPath | ConvertFrom-Json)
+        $encoded = Get-Content $ParameterPath
+        $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($encoded))
+        return ($decoded | ConvertFrom-Json)
     }
 }
 
-# $Variables = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
+# values = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
 # $values = ConvertFrom-Json -InputObject $Variables
 # populate variables from parameters.json
-$values = Read-ParametersJson -ParameterPath "C:\\Temp\\variables.json"
+$values = Read-ParametersJson -ParameterPath $Variables
 
 $AdminName = $values.admin_name
 $AdminPassword = $values.admin_password

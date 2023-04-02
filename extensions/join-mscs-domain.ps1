@@ -99,8 +99,9 @@ Function Write-EventLog {
 
 # Parse the VM parameters JSON.
 # $Variables = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
-$values = ConvertFrom-Json -InputObject $Variables
-
+# $Variables is a base64 encoded string containing a Json object.  Decode it first, then validate if it is a proper Json object. Finally, load each properties into variables.
+$decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($Variables))
+$values = ConvertFrom-Json -InputObject $decoded
 # Extract the VM parameters for this script to run
 $AdminName = $values.admin_name
 $Secret = $values.admin_password
@@ -141,9 +142,9 @@ while ($retries -lt $maxRetries) {
         # download and store the post-config script for the scheduled task to run after joining the domain reboot
         $scriptUrl = "https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
         $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
-        $parameterPath = "C:\\Temp\\variables.json"
-        $values | Out-File -FilePath $parameterPath -Encoding ASCII
-        
+        $parameterPath = "C:\\Temp\\variables.txt"
+        $Variables | Out-File -FilePath $parameterPath -Encoding utf8 -Force
+
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 10 -RetryIntervalSeconds 1
         Write-EventLog -Message "Downloaded script to run after reboot (task schedule) $scriptPath" -EntryType Information
 

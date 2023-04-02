@@ -400,7 +400,6 @@ Function Set-RequiredFirewallRules {
 # Execution Body
 ############################################################################################################
 
-# $Variables = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
 try {
     # $Variables is a base64 encoded string containing a Json object.  Decode it first, then validate if it is a proper Json object. Finally, load each properties into variables.
     $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($Variables))
