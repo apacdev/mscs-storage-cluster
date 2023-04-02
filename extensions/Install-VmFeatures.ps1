@@ -400,51 +400,12 @@ Function Set-RequiredFirewallRules {
 # Execution Body
 ############################################################################################################
 
-<#
-var config_variables  = {
-  admin_name: admin_name
-  admin_password: admin_password
-  domain_name: domain_name 
-  domain_netbios_name: domain_netbios_name
-  domain_server_ip: domain_server_ip
-  storage_account_name: storage_account_resource.name
-  storage_account_key: storage_account_resource.listKeys().keys[0].value
-  cluster_name: cluster_name 
-  cluster_ip: cluster_ip
-  cluster_role_ip: cluster_role_ip
-  cluster_network_name: cluster_network_name
-  cluster_probe_port: cluster_probe_port
-}
-#>
-
-$argsParam = $args[0]
-$VmVariables = ConvertFrom-Json $Variables
-
-Write-Output $argsParam
-Write-Output $VmVariables
-
-
-Write-EventLog -Message "Starting Windows VM Custom Script Extension" -EntryType Information
-Write-EventLog -Message "Parameters: $vmParameters" -EntryType Information
-
-Write-Output "AdminName: $($vmParameters.admin_name)"
-Write-Output "DomainName: $($vmParameters.domain_name)"
-Write-Output "DomainNetBiosName: $($vmParameters.domain_netbios_name)"
-Write-Output "DomainServerIpAddress: $($vmParameters.domain_server_ip)"
-Write-Output "SaName: $($vmParameters.storage_account_name)"
-Write-Output "SaKey: $($vmParameters.storage_account_key)"
-Write-Output "ClusterName: $($vmParameters.cluster_name)"
-Write-Output "ClusterIp: $($vmParameters.cluster_ip)"
-Write-Output "ClusterRoleIpAddress: $($vmParameters.cluster_role_ip)"
-Write-Output "ClusterNetworkName: $($vmParameters.cluster_network_name)"
-Write-Output "ProbePort: $($vmParameters.cluster_probe_port)"
-
-$AdminName = $vmParameters.admin_name
-$Secret = $vmParameters.admin_password
-$DomainName = $vmParameters.domain_name
-$DomainNetBiosName = $vmParameters.domain_netbios_name
-
-# $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -Role $Role -ArgumentList $Parameters`""
+# $Variables = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
+$values = ConvertFrom-Json -InputObject $Variables
+$AdminName = $values.admin_name
+$Secret = $values.admin_password
+$DomainName = $values.domain_name
+$DomainNetbiosName = $values.domain_netbios_name
 
 ############################################################################################################
 # Variable Definitions
@@ -474,7 +435,6 @@ try {
         
         if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
             Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
-        
             Set-ADDomainServices -DomainName $DomainName -DomainNetBiosName $DomainNetbiosName -Credential $credential
         }
         else {
@@ -488,9 +448,9 @@ try {
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
         # action: join-mscs-domain.ps1
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -Variables $VmVariables`""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -Variables $values`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
-        $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
+        $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
         Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
         Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information

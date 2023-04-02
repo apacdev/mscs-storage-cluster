@@ -7,7 +7,7 @@ targetScope = 'subscription'
 // ************************************************************************************************
 
 @description('Admin Username for the Virtual Machine and Ad Domain.')
-param admin_name string = 'ContosoAdmin'
+param admin_name string = 'pashim'
 
 @description('Admin Password for the Virtual Machine and Ad Domain.')
 @maxLength(18)
