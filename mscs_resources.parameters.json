@@ -141,7 +141,7 @@
       "value": "mscs-cluster"
     },
     "cluster_ip": {
-      "value": "172.16.0.100"
+      "value": "172.16.1.100"
     }
   }
 }

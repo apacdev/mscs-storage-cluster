@@ -63,11 +63,11 @@ param vm_02_role string = 'cluster-node'
 @description('Role of the VM-03.')
 param vm_03_role string = 'cluster-node'
 
-@description('IP for Cluster and Load Balancer.')
-param ilb_ip_addr string = '172.16.1.50'
-
 @description('Name of Internal Loadbalancer.')
 param ilb_name string = 'mscs-ilb'
+
+@description('IP for Cluster Role and Load Balancer Frontend.')
+param ilb_ipv4_addr string = '172.16.1.100'
 
 @description('Internal IP address for the VM-01.')
 param iip_v4_01_addr string = '172.16.0.100'
@@ -77,6 +77,9 @@ param iip_v4_02_addr string = '172.16.1.101'
 
 @description('Internal IP address for the VM-03.')
 param iip_v4_03_addr string = '172.16.1.102'
+
+@description('Port number for Probe.')
+param probe_port string = '61800'
 
 @description('IPv4 address-space for the Virtual Network.')
 param vnet_ipv4_addr string = '172.16.0.0/16'
@@ -150,14 +153,17 @@ param log_space_sku string  = 'PerGB2018'
 @description('Name for the Failover Cluster.')
 param cluster_name string = 'mscs-cluster'
 
-@description('Name for the Cluster Instance IPv4 Address.')
-param cluster_ip string = ilb_ip_addr
+@description('IPv4 Address for Cluster Instance.')
+param cluster_ip string = '172.16.1.50'
+
+@description('Cluster Role IPv4 Address (should match with Frontend IP of Internal Load Balancer).')
+param cluster_role_ip string = ilb_ipv4_addr
 
 @description('Name for the Cluster Network.')
 param cluster_network_name string = 'Cluster Network 1'
 
 @description('Port for the Cluster Probe.')
-param cluster_probe_port string = '61800'
+param cluster_probe_port string = probe_port
 
 @description('Allowed size of the Virtual Machines.')
 @allowed([
@@ -250,6 +256,8 @@ module vnet_resources 'mscs_network_module.bicep' = {
 
     // load balancer
     ilb_name: ilb_name
+    lib_ipv4_addr: ilb_ipv4_addr
+    ilb_probe_port: probe_port
   }
   scope: mscs_network_resources
 }
@@ -320,7 +328,7 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
 
     cluster_name: cluster_name
     cluster_ip: cluster_ip
-    cluster_role_ip: ilb_ip_addr
+    cluster_role_ip: cluster_role_ip
     cluster_network_name: cluster_network_name
     cluster_probe_port: cluster_probe_port
 

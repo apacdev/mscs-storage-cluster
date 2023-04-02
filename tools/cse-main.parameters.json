@@ -5,14 +5,20 @@
     "admin_name": {
       "value": "pashim"
     },
+    "mscs_compute_resources_name": {
+      "value": "mscs_compute_resources"
+    },
+    "mscs_common_resources_name": {
+      "value": "mscs_common_resources"
+    },
     "vm_01_name": {
-      "value": "mscswvm-01"
+      "value": "mscswvm-dns-01"
     },
     "vm_02_name": {
-      "value": "mscswvm-02"
+      "value": "mscswvm-node-02"
     },
     "vm_03_name": {
-      "value": "mscswvm-03"
+      "value": "mscswvm-node-03"
     },
     "vm_01_role": {
       "value": "ad-domain"
@@ -23,15 +29,6 @@
     "vm_03_role": {
       "value": "cluster-node"
     },
-    "iip_v4_01_addr": {
-      "value": "172.16.0.100"
-    },
-    "iip_v4_02_addr": {
-      "value": "172.16.1.101"
-    },
-    "iip_v4_03_addr": {
-      "value": "172.16.1.102"
-    },
     "domain_name": {
       "value": "neostation.org"
     },
@@ -41,14 +38,23 @@
     "domain_server_ip": {
       "value": "172.16.0.100"
     },
+    "cluster_name": {
+      "value": "mscs-cluster"
+    },
+    "cluster_ip": {
+      "value": "172.16.1.50"
+    },
+    "cluster_role_ip": {
+      "value": "172.16.1.100"
+    },
+    "cluster_network_name": {
+      "value": "Cluster Network 1"
+    },
+    "cluster_probe_port": {
+      "value": "61800"
+    },
     "storage_account_name": {
       "value": "mscskrcommonstoragespace"
-    },
-    "mscs_compute_resources_name": {
-      "value": "mscs_compute_resources"
-    },
-    "mscs_common_resources_name": {
-      "value": "mscs_common_resources"
     }
   }
 }
