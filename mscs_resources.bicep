@@ -350,6 +350,8 @@ module common_resources 'mscs_common_module.bicep' = {
   params: {
     location: mscs_common_resources.location
     storage_account_name: storage_account_name
+    vnet_name: vnet_name
+    mscs_network_resources_name: mscs_network_resources_name
     automate_name: automate_name
     log_space_name: log_space_name
     log_space_sku: log_space_sku

@@ -22,6 +22,14 @@ param automate_name string
 @description('Name of the Azure Storage Account.')
 param storage_account_name string
 
+@description('Name of the vnet resource.')
+param vnet_name string
+
+param mscs_network_resources_name string
+resource vnet_resource 'Microsoft.Network/virtualNetworks@2022-09-01' existing = {
+  name: vnet_name
+  scope: resourceGroup(mscs_network_resources_name)
+}
 // create resource for Azure Storage Account
 resource storage_account_resource 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   name: storage_account_name
@@ -32,7 +40,7 @@ resource storage_account_resource 'Microsoft.Storage/storageAccounts@2022-09-01'
   kind: 'StorageV2'
   properties: {
     publicNetworkAccess: 'Enabled'
-    supportsHttpsTrafficOnly: true
+    supportsHttpsTrafficOnly: false
     accessTier: 'Hot'
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: true
@@ -40,6 +48,16 @@ resource storage_account_resource 'Microsoft.Storage/storageAccounts@2022-09-01'
     allowedCopyScope: 'AAD'
     isHnsEnabled: true
     largeFileSharesState: 'Disabled'
+   networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Allow'
+      virtualNetworkRules: [
+        {
+          id: vnet_resource.id
+          action: 'Allow'
+        }
+      ]
+   }
   }
 }
 

@@ -102,6 +102,7 @@ Function Write-EventLog {
 # $Variables is a base64 encoded string containing a Json object.  Decode it first, then validate if it is a proper Json object. Finally, load each properties into variables.
 $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($Variables))
 $values = ConvertFrom-Json -InputObject $decoded
+
 # Extract the VM parameters for this script to run
 $AdminName = $values.admin_name
 $Secret = $values.admin_password

@@ -432,7 +432,7 @@ Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
 Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
 # Install required Windows Features for Domain Controller Setup
-if ($Role -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|failover-node|failover|node)).*$') {
+if ($values.vm_role -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|failover-node|failover|node)).*$') {
 
     Set-RequiredFirewallRules -IsActiveDirectory $true 
     
