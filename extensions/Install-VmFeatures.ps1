@@ -2,11 +2,6 @@ param(
     [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Variables
 )
 
-Write-Output $Variables
-Write-Error $Variables
-
-Write-Host 'Hello world'
-<#
 ############################################################################################################
 # Function Definitions
 ############################################################################################################
@@ -406,63 +401,61 @@ Function Set-RequiredFirewallRules {
 ############################################################################################################
 
 # $Variables = '{"vm_role":"cluster", "admin_name":"pashim", "admin_password":"Roman@2013!2015", "domain_name":"neostation.org", "domain_netbios_name":"NEOSTATION", "domain_server_ip":"172.16.0.100", "cluster_name":"mscs-cluster", "cluster_ip":"172.16.1.50", "cluster_role_ip": "172.16.1.100", "cluster_network_name": "Cluster Network 1", "cluster_probe_port": "61800", "sa_name": "mscskrcommonstoragespace", "sa_key": "8AOz8Rjj2n4/aao2KdMf5YDpIzB6wfBrAZf4KpQzoEU/33EZ7GGgHlvxpCFBOTl2wMWDRxNe6bm++AStFbGMIw=="}'
-$values = ConvertFrom-Json -InputObject $Variables
-$AdminName = $values.admin_name
-$Secret = $values.admin_password
-$DomainName = $values.domain_name
-$DomainNetbiosName = $values.domain_netbios_name
+try {
+    # $Variables is a base64 encoded string containing a Json object.  Decode it first, then validate if it is a proper Json object. Finally, load each properties into variables.
+    $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($Variables))
+    $values = ConvertFrom-Json -InputObject $decoded
+    
+    $AdminName = $values.admin_name
+    $Secret = $values.admin_password
+    $DomainName = $values.domain_name
+    $DomainNetbiosName = $values.domain_netbios_name
+
+    $tempPath = "C:\\Temp"
+    $msi = "PowerShell-7.3.2-win-x64.msi"
+    $msiPath = "$tempPath\\$msi"
+    $powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
+    $timeZone = "Singapore Standard Time"
+    $scriptUrl = "https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/join-mscs-domain.ps1"
+    $scriptPath = "C:\\Temp\\join-mscs-domain.ps1"
+    $adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
+    $credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
+} catch {
+    Write-EventLog -Message "Error: $($_.Exception.Message)" -EntryType Error
+}
 
 ############################################################################################################
 # Variable Definitions
 ############################################################################################################
 
-$tempPath = "C:\\Temp"
-$msi = "PowerShell-7.3.2-win-x64.msi"
-$msiPath = "$tempPath\\$msi"
-$powershellUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/$msi"
-$timeZone = "Singapore Standard Time"
-$scriptUrl = "https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/join-mscs-domain.ps1"
-$scriptPath = "C:\\Temp\\join-mscs-domain.ps1"
-$adminSecret = ConvertTo-SecureString -String $Secret -AsPlainText -Force
-$credential = New-Object System.Management.Automation.PSCredential($AdminName, $adminSecret)
-
-############################################################################################################
-
-try {
-        Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
-        Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
-        Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
+Write-EventLog -Message "Starting installation of roles and features (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
+Set-DefaultVmEnvironment -TempFolderPath $tempPath -TimeZone $timeZone
+Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
-    # Install required Windows Features for Domain Controller Setup
-    if ($Role -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|failover-node|failover|node)).*$') {
+# Install required Windows Features for Domain Controller Setup
+if ($Role -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|failover-node|failover|node)).*$') {
 
-        Set-RequiredFirewallRules -IsActiveDirectory $true 
-        
-        if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
-            Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
-            Set-ADDomainServices -DomainName $DomainName -DomainNetBiosName $DomainNetbiosName -Credential $credential
-        }
-        else {
-            Set-ADDomainServices -DomainName $DomainName -DomainNetBiosName $DomainNetbiosName -Credential $credential
-        }
+    Set-RequiredFirewallRules -IsActiveDirectory $true 
+    
+    if (-not (Test-WindowsFeatureInstalled -FeatureName "AD-Domain-Services")) {
+        Install-RequiredWindowsFeatures -FeatureList @("AD-Domain-Services", "RSAT-AD-PowerShell", "DNS", "NFS-Client")
+        Set-ADDomainServices -DomainName $DomainName -DomainNetBiosName $DomainNetbiosName -Credential $credential
     }
     else {
-        # Install required Windows Features for Failover Cluster and File Server Setup
-        Set-RequiredFirewallRules -IsActiveDirectory $false
-        Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
-        Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
-        Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
-        # action: join-mscs-domain.ps1
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -Variables $values`""
-        $trigger = New-ScheduledTaskTrigger -AtLogOn
-        $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
-        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
-        Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
-        Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
+        Set-ADDomainServices -DomainName $DomainName -DomainNetBiosName $DomainNetbiosName -Credential $credential
     }
 }
-catch {
-    Write-EventLog -Message $_.Exception.Message -EntryType Error 
+else {
+    # Install required Windows Features for Failover Cluster and File Server Setup
+    Set-RequiredFirewallRules -IsActiveDirectory $false
+    Install-RequiredWindowsFeatures -FeatureList @("Failover-Clustering", "RSAT-AD-PowerShell", "FileServices", "FS-FileServer", "FS-iSCSITarget-Server", "FS-NFS-Service", "NFS-Client", "TFTP-Client", "Telnet-Client")
+    Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
+    Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
+    # action: join-mscs-domain.ps1
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -Variables $Variables`""
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskName "Join-MscsDomain" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
+    Write-EventLog -Message "Scheduled task to join the cluster to the domain created (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
 }
-
-#>
