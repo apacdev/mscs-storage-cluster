@@ -2,6 +2,9 @@ param(
     [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Variables
 )
 
+    Write-Output $Variables
+    Write-Error $Variables
+<#
 ############################################################################################################
 # Function Definitions
 ############################################################################################################
@@ -459,3 +462,5 @@ try {
 catch {
     Write-EventLog -Message $_.Exception.Message -EntryType Error 
 }
+
+#>
