@@ -3,10 +3,13 @@ param (
     [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
     [Parameter(Mandatory = $true)] [string] $AdminName,
     [Parameter(Mandatory = $true)] [string] $AdminPass,
-    [Parameter(Mandatory = $true)] [string] $ClusterIpAddress, 
-    [Parameter(Mandatory = $true)] [string] $ClusterName,
-    [Parameter(Mandatory = $true)] [string] $StorageAccountName,
-    [Parameter(Mandatory = $true)] [string] $StorageAccountKey
+    [Parameter(Mandatory = $true)] [string] $ClusterIpAddress,              # Cluster's IP
+    [Parameter(Mandatory = $true)] [string] $ClusterName,                   # MSCS Cluster Instance Name
+    [Parameter(Mandatory = $true)] [string] $StorageAccountName,            # Cloud Witness Storage Account Name
+    [Parameter(Mandatory = $true)] [string] $StorageAccountKey,             # Cloud Witness Storage Account Key
+    [Parameter(Mandatory = $true)] [string] $ClusterNetworkName,            # Cluster Network 1
+    [Parameter(Mandatory = $true)] [string] $ClusterRoleIpAddress,          # File Server IP (ILB)
+    [Parameter(Mandatory = $true)] [string] $ProbePort                      # Probe Port (ILB)
 )
 
 # Function to download a file from a URL, retrying if necessary.
@@ -134,18 +137,32 @@ while ($retries -lt $MaxRetries) {
         try {
             $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
             $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
-            
+            # Save parameters for post-configuration process after domain join and reboot
             $parameterPath = "C:\\Temp\\parameters.json"
-            @{
+            $parameters = @{
                 "DomainName" = $DomainName
                 "ClusterName" = $ClusterName
                 "ClusterIpAddress" = $ClusterIpAddress
                 "StorageAccountName" = $StorageAccountName
                 "StorageAccountKey" = $StorageAccountKey
+                "ClusterNetworkName" = $ClusterNetworkName
+                "ClusterRoleIpAddress" = $ClusterRoleIpAddress
+                "ProbePort" = $ProbePort
             } | ConvertTo-Json | Out-File -FilePath $parameterPath -Encoding ASCII
+            Write-EventLog -Message "Saved parameters for post-configuration process after domain join and reboot $parameters" -EntryType Information
 
-            Invoke-WebRequest -Uri $scriptUrl -UseBasicParsing | Select-Object -ExpandProperty Content | Out-File -FilePath $scriptPath -Encoding ASCII
-            Write-EventLog -Message "Downloaded script $scriptPath" -EntryType Information
+            # Download script to run after reboot
+            Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 10 -RetryIntervalSeconds 1
+            Write-EventLog -Message "Downloaded script to run after reboot (task schedule) $scriptPath" -EntryType Information
+
+            # Register a task to run once after reboot
+            $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath'`""
+            $trigger = New-ScheduledTaskTrigger -AtLogOn
+            $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
+            $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
+            Register-ScheduledTask -TaskName "Configure FS Cluster" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
+            Write-EventLog -Message "Registered task to run after reboot (task schedule) $scriptPath" -EntryType Information
+
         } catch {
             Write-EventLog -Message "Failed to download script to join machines to domain $scriptPath" -EntryType Error
         }

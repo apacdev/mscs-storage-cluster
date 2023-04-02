@@ -1,60 +1,4 @@
-<#
-.SYNOPSIS
-Short description
-
-.DESCRIPTION
-Long description
-
-.PARAMETER Message
-Parameter description
-
-.PARAMETER Source
-Parameter description
-
-.PARAMETER EventLogName
-Parameter description
-
-.PARAMETER EntryType
-Parameter description
-
-.EXAMPLE
-An example
-
-.NOTES
-General notes
-#>
-
-# A function to read c:\temp\parameters.json 
-Function Read-ParametersJson {
-    param(
-        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ParameterPath
-    )
-    # read parameters.json file and convert to object.  throw an error if the file is not found, or return the object.
-    if (-not (Test-Path $ParameterPath)) { 
-        throw "File not found: $ParameterPath."
-        break
-    } else {
-        return (Get-Content $ParameterPath | ConvertFrom-Json)
-    }
-}
-
-# populate variables from parameters.json
-$parameters = Read-ParametersJson -ParameterPath "C:\\Temp\\parameters.json"
-$domainName = $parameters.domainName
-$domainServerIpAddress = $parameters.domainServerIpAddress
-$AdminName = $parameters.AdminName
-$Secret = $parameters.AdminPass
-$ClusterIpAddress = $parameters.ClusterIpAddress
-$ClusterName = $parameters.ClusterName
-$StorageAccountName = $parameters.StorageAccountName
-$StorageAccountKey = $parameters.StorageAccountKey
-
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret' -ClusterIpAddress $ClusterIpAddress -ClusterName '$ClusterName' -StorageAccount '$StorageAccountName' -StorageAccountKey '$StorageAccountKey'`""
-$trigger = New-ScheduledTaskTrigger -AtLogOn
-$trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
-
-
+# A function to simplify Event Log creation and writing.
 Function Write-EventLog {
     param(
         [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Message,
@@ -96,6 +40,7 @@ Function Write-EventLog {
     }
 }
 
+# Function to set the cluster shared volume (CSV)
 Function Set-MscsClusterSharedVolume {
     [CmdletBinding()]
     param(
@@ -104,35 +49,43 @@ Function Set-MscsClusterSharedVolume {
         [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterName
     )
     try {
+        # get the disk object and check if the disk is already partitioned
         $drive = Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName } 
         $isPartitioned = Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName } | Get-Partition | Select-Object -Property DiskNumber, PartitionNumber, PartitionStyle, DriveLetter
 
         if ($drive.PartitionStyle -eq "RAW") {
+            # If now partitioned, partition the disk and format it to GPT / NTFS
             Initialize-Disk -Number $drive.DiskNumber -PartitionStyle "GPT"
             Write-EventLog -Message "Set-MscsClusterSharedVolume: Initialize-Disk -Number $drive.DiskNumber -PartitionStyle GPT"
-
+            # Create a new partition on the disk and assign a drive letter
             $part = New-Partition -DiskNumber $drive.DiskNumber -AssignDriveLetter -UseMaximumSize 
             Write-EventLog -Message "Set-MscsClusterSharedVolume: New-Partition -DiskNumber $drive.DiskNumber -AssignDriveLetter -UseMaximumSize"
-
+            # Format the partition to NTFS
             Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force
             Write-EventLog -Message "Set-MscsClusterSharedVolume: Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force"
-                
+            # Add the disk to the cluster
             Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })
             Write-EventLog -Message "Set-MscsClusterSharedVolume: Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })"
         }
         else { 
             if ($null -eq $isPartitioned) {
+                # If the disk is already partitioned, but not formatted, format the disk to GPT / NTFS (this mean the disk has been initialized, but not partitioned)
                 $part = New-Partition -DiskNumber $drive.DiskNumber -AssignDriveLetter -UseMaximumSize 
                 Write-EventLog -Message "Set-MscsClusterSharedVolume: New-Partition -DiskNumber $drive.DiskNumber -AssignDriveLetter -UseMaximumSize"
-
+                # Format the partition to NTFS
                 Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force
                 Write-EventLog -Message "Set-MscsClusterSharedVolume: Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force"
-                
+                # Add the disk to the cluster
                 Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })
                 Write-EventLog -Message "Set-MscsClusterSharedVolume: Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })"  
             }
             else {
-                Write-EventLog -Message "Set-MscsClusterSharedVolume: Disk $DiskFriendlyName is already partitioned. Skipping partitioning."
+                # If the disk is already initialized and partitioned, format the partition to NTFS
+                Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force
+                Write-EventLog -Message "Set-MscsClusterSharedVolume: Format-Volume -DriveLetter $part.DriveLetter -FileSystem NTFS -NewFileSystemLabel $DiskVolumeLable -Confirm:$false -Force"
+                # Add the disk to the cluster
+                Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })
+                Write-EventLog -Message "Set-MscsClusterSharedVolume: Add-ClusterDisk -Cluster $ClusterName -InputObject (Get-Disk | Where-Object { $_.FriendlyName -eq $DiskFriendlyName })" 
             }
         }
     }
@@ -141,20 +94,57 @@ Function Set-MscsClusterSharedVolume {
         throw $_.Exception
     }
 }
-#
+
+# Function to read parameters.json file
+Function Read-ParametersJson {
+    param(
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ParameterPath
+    )
+    # read parameters.json file and convert to object.  throw an error if the file is not found, or return the object.
+    if (-not (Test-Path $ParameterPath)) { 
+        throw "File not found: $ParameterPath."
+        break
+    }
+    else {
+        return (Get-Content $ParameterPath | ConvertFrom-Json)
+    }
+}
+
+# populate variables from parameters.json
+$parameters = Read-ParametersJson -ParameterPath "C:\\Temp\\parameters.json"
+$domainName = $parameters.domainName
+$domainServerIpAddress = $parameters.domainServerIpAddress
+$AdminName = $parameters.AdminName
+$Secret = $parameters.AdminPass
+$ClusterIpAddress = $parameters.ClusterIpAddress
+$ClusterName = $parameters.ClusterName
+$StorageAccountName = $parameters.StorageAccountName
+$StorageAccountKey = $parameters.StorageAccountKey
+$ClusterNetworkName = $parameters.ClusterNetworkName
+$ClusterRoleIpAddress = $parameters.ClusterRoleIpAddress
+$ProbePort = $parameters.ProbePort
+
+
 $expectedNodeCount = 1
 $localName = $env:COMPUTERNAME
 $nodes = @(Get-ADComputer -Filter { Name -like "*node*" } | Select-Object -ExpandProperty DNSHostName)
 
-if ($nodes.Count -ge $expectedNodeCount) {
-    $components = ((($nodes[0]).Split('.'))[0])
-    if ($components.Equals($localName)) {
-        Write-EventLog -Message "Creating a new failover cluster named $ClusterName"
-        New-Cluster -Name $ClusterName -Node @($nodes) -StaticAddress $ClusterIpAddress -NoStorage
-        Set-ClusterQuorum -CloudWitness -AccountName $StorageAccountName -AccessKey $StorageAccountKey -Cluster $ClusterName 
-        Set-MscsClusterSharedVolume -ClusterName $ClusterName
-    }  
+try {
+    if ($nodes.Count -ge $expectedNodeCount) {
+        $components = ((($nodes[0]).Split('.'))[0])
+
+        if ($components.Equals($localName)) {
+            # Get local node name and compare it to the first node in the list (cluster configuration in usually done on one node only)
+            Write-EventLog -Message "Creating a new failover cluster named $ClusterName"
+            New-Cluster -Name $ClusterName -Node @($nodes) -StaticAddress $ClusterIpAddress -NoStorage
+            Set-ClusterQuorum -CloudWitness -AccountName $StorageAccountName -AccessKey $StorageAccountKey -Cluster $ClusterName 
+            Set-MscsClusterSharedVolume -ClusterName $ClusterName
+        }
+    } else {
+        Write-Event -Message "At least 2 or more nodes are required to form a cluster." -EntryType [System.Diagnostics.EventLogEntryType]::Error
+    }
 }
-else {
-    Write-Host "At least 2 or more nodes are required to form a cluster."    
+catch {
+    Write-EventLog -Message "Error creating cluster: $_.Exception.Message" -EntryType [System.Diagnostics.EventLogEntryType]::Error
+    throw $_.Exception
 }
