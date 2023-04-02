@@ -2,8 +2,10 @@ param(
     [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Variables
 )
 
-    Write-Output $Variables
-    Write-Error $Variables
+Write-Output $Variables
+Write-Error $Variables
+
+Write-Host 'Hello world'
 <#
 ############################################################################################################
 # Function Definitions
