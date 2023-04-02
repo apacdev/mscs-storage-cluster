@@ -331,6 +331,7 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     cluster_role_ip: cluster_role_ip
     cluster_network_name: cluster_network_name
     cluster_probe_port: cluster_probe_port
+    
     mscs_common_resources: mscs_common_resources_name
     storage_account_name: storage_account_name
   }
