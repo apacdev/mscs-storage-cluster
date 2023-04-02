@@ -135,7 +135,7 @@ while ($retries -lt $MaxRetries) {
         Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -EntryType Information
         
         try {
-            $scriptUrl = "https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
+            $scriptUrl = "https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
             $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
             # Save parameters for post-configuration process after domain join and reboot
             $parameterPath = "C:\\Temp\\parameters.json"

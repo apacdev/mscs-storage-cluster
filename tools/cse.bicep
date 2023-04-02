@@ -68,7 +68,7 @@ resource vm_01_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
     type: 'CustomScriptExtension'
     typeHandlerVersion: '1.9'
     settings: {
-      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
+      fileUris: ['https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
     }
     protectedSettings: {
       commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -ResourceGroupName ${resource_group_name} -VmName ${vm_01_name} -VmRole ${vm_01_role} -AdminName ${admin_name} -Secret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -NodeList ${nodeList} -SaName ${saname} -SaKey ${sakey}'
@@ -86,7 +86,7 @@ resource vm_02_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
     typeHandlerVersion: '1.9'
     autoUpgradeMinorVersion: true
     settings: {
-      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
+      fileUris: ['https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
     }
     protectedSettings: {
       commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -ResourceGroupName ${resource_group_name} -VmName ${vm_02_name} -VmRole ${vm_02_role} -AdminName ${admin_name} -Secret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -NodeList ${nodeList} -SaName ${saname} -SaKey ${sakey}'
@@ -104,7 +104,7 @@ resource vm_03_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
     typeHandlerVersion: '1.9'
     autoUpgradeMinorVersion: true
     settings: {
-      fileUris: ['https://raw.githubusercontent.com/ms-apac-csu/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
+      fileUris: ['https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/Install-VmFeatures.ps1']
     }
     protectedSettings: {
       commandToExecute: 'powershell.exe -ExecutionPolicy Unrestricted -File Install-VmFeatures.ps1 -ResourceGroupName ${resource_group_name} -VmName ${vm_03_name} -VmRole ${vm_03_role} -AdminName ${admin_name} -Secret ${admin_password} -DomainName ${domain_name} -DomainNetBiosName ${domain_netbios_name} -DomainServerIpAddress ${domain_server_ip} -NodeList ${nodeList} -SaName ${saname} -SaKey ${sakey}'
