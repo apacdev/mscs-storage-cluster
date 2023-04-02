@@ -31,10 +31,8 @@ resource storage_account_resource 'Microsoft.Storage/storageAccounts@2022-09-01'
   name: storage_account_name
   scope: resourceGroup(mscs_common_resources)
 }
-
 var sa_name = storage_account_resource.name
 var sa_key = storage_account_resource.listKeys().keys[0].value
-
 // ************************************************************************************************
 var vm_01_variables = base64('{"vm_role":"${vm_01_role}", "admin_name":"${admin_name}", "admin_password":"${admin_password}", "domain_name":"${domain_name}", "domain_netbios_name":"${domain_netbios_name}", "domain_server_ip":"${domain_server_ip}", "cluster_name":"${cluster_name}", "cluster_ip":"${cluster_ip}", "cluster_role_ip": "${cluster_role_ip}", "cluster_network_name": "${cluster_network_name}", "cluster_probe_port": "${cluster_probe_port}", "sa_name": "${sa_name}", "sa_key": "${sa_key}"}')
 var vm_02_variables = base64('{"vm_role":"${vm_02_role}", "admin_name":"${admin_name}", "admin_password":"${admin_password}", "domain_name":"${domain_name}", "domain_netbios_name":"${domain_netbios_name}", "domain_server_ip":"${domain_server_ip}", "cluster_name":"${cluster_name}", "cluster_ip":"${cluster_ip}", "cluster_role_ip": "${cluster_role_ip}", "cluster_network_name": "${cluster_network_name}", "cluster_probe_port": "${cluster_probe_port}", "sa_name": "${sa_name}", "sa_key": "${sa_key}"}')
