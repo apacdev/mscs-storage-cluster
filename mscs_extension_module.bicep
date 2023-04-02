@@ -8,6 +8,7 @@ param admin_name string
 @maxLength(18)
 @secure()
 param admin_password string
+
 param location string
 param domain_name string
 param domain_netbios_name string
@@ -38,13 +39,12 @@ var sa_key = storage_account_resource.listKeys().keys[0].value
 var vm_01_variables = base64('{"vm_role":"${vm_01_role}", "admin_name":"${admin_name}", "admin_password":"${admin_password}", "domain_name":"${domain_name}", "domain_netbios_name":"${domain_netbios_name}", "domain_server_ip":"${domain_server_ip}", "cluster_name":"${cluster_name}", "cluster_ip":"${cluster_ip}", "cluster_role_ip": "${cluster_role_ip}", "cluster_network_name": "${cluster_network_name}", "cluster_probe_port": "${cluster_probe_port}", "sa_name": "${sa_name}", "sa_key": "${sa_key}"}')
 var vm_02_variables = base64('{"vm_role":"${vm_02_role}", "admin_name":"${admin_name}", "admin_password":"${admin_password}", "domain_name":"${domain_name}", "domain_netbios_name":"${domain_netbios_name}", "domain_server_ip":"${domain_server_ip}", "cluster_name":"${cluster_name}", "cluster_ip":"${cluster_ip}", "cluster_role_ip": "${cluster_role_ip}", "cluster_network_name": "${cluster_network_name}", "cluster_probe_port": "${cluster_probe_port}", "sa_name": "${sa_name}", "sa_key": "${sa_key}"}')
 var vm_03_variables = base64('{"vm_role":"${vm_03_role}", "admin_name":"${admin_name}", "admin_password":"${admin_password}", "domain_name":"${domain_name}", "domain_netbios_name":"${domain_netbios_name}", "domain_server_ip":"${domain_server_ip}", "cluster_name":"${cluster_name}", "cluster_ip":"${cluster_ip}", "cluster_role_ip": "${cluster_role_ip}", "cluster_network_name": "${cluster_network_name}", "cluster_probe_port": "${cluster_probe_port}", "sa_name": "${sa_name}", "sa_key": "${sa_key}"}')
-
 // ************************************************************************************************
 resource vm_01_resource 'Microsoft.Compute/virtualMachines@2022-11-01' existing = { name: vm_01_name }
 resource vm_02_resource 'Microsoft.Compute/virtualMachines@2022-11-01' existing = { name: vm_02_name }
 resource vm_03_resource 'Microsoft.Compute/virtualMachines@2022-11-01' existing = { name: vm_03_name }
-
 // ************************************************************************************************
+
 resource vm_01_cse 'Microsoft.Compute/VirtualMachines/extensions@2022-11-01' = {
   parent: vm_01_resource
   name: 'cse_dc_extension'
