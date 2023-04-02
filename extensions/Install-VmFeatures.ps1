@@ -420,6 +420,9 @@ var config_variables  = {
 $argsParam = $args[0]
 $VmVariables = ConvertFrom-Json $Variables
 
+Write-Output $argsParam
+Write-Output $VmVariables
+
 
 Write-EventLog -Message "Starting Windows VM Custom Script Extension" -EntryType Information
 Write-EventLog -Message "Parameters: $vmParameters" -EntryType Information
