@@ -79,6 +79,12 @@ param nic_03_name string
 @description('Name of Internal Load Balancer.')
 param ilb_name string
 
+@description('Port Number for Probe.')
+param ilb_probe_port string
+
+@description('IPv4 address for the Internal Load Balancer.')
+param lib_ipv4_addr string
+
 // create resource for Virtual Network (x.x.x.x/16)
 resource vnet_resource 'Microsoft.Network/virtualNetworks@2022-07-01' = {
   name: vnet_name
@@ -566,7 +572,7 @@ resource ilb_resource 'Microsoft.Network/loadBalancers@2022-09-01' = {
         name: 'front'
         properties: {
           privateIPAllocationMethod: 'Static'
-          privateIPAddress: '172.16.1.50'
+          privateIPAddress: lib_ipv4_addr
           privateIPAddressVersion: 'IPv4'
           subnet: {
             id: subnet_02_resource.id
@@ -608,7 +614,7 @@ resource ilb_resource 'Microsoft.Network/loadBalancers@2022-09-01' = {
         name: 'probe'
         properties: {
           protocol: 'Tcp'
-          port: 61800
+          port: ilb_probe_port
           intervalInSeconds: 15
           numberOfProbes: 5
         }

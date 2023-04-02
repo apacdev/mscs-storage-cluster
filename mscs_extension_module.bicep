@@ -37,7 +37,6 @@ param cluster_probe_port string
   scope: resourceGroup(mscs_common_resources_name)
 }
 
-
 var config_variables  = {
   admin_name: admin_name
   admin_password: admin_password

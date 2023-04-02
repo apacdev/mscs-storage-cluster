@@ -434,7 +434,6 @@ Write-Output "ClusterRoleIpAddress: $($vmParameters.cluster_role_ip)"
 Write-Output "ClusterNetworkName: $($vmParameters.cluster_network_name)"
 Write-Output "ProbePort: $($vmParameters.cluster_probe_port)"
 
-$vmRole = $Role
 $AdminName = $vmParameters.admin_name
 $Secret = $vmParameters.admin_password
 $DomainName = $vmParameters.domain_name
@@ -464,7 +463,7 @@ try {
         Install-PowerShellWithAzModules -Url $powershellUrl -Msi $msiPath
     
     # Install required Windows Features for Domain Controller Setup
-    if ($VmRole -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|failover-node|failover|node)).*$') {
+    if ($Role -match '^(?=.*(?:domain|dc|ad|dns|domain-controller|ad-domain|domaincontroller|ad-domain-server|ad-dns|dc-dns))(?!.*(?:cluster|cluster-node|failover-node|failover|node)).*$') {
 
         Set-RequiredFirewallRules -IsActiveDirectory $true 
         
