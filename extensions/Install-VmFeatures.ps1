@@ -1,84 +1,6 @@
-<#
-.DISCLAIMER
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-.LICENSE
-Copyright (c) Microsoft Corporation. All rights reserved.
-
-.AUTHOR
-patrick.shim@live.co.kr (Patrick Shim)
-
-.VERSION
-1.0.0.10 / 2022-03-30
-
-.SYNOPSIS
-Custom Script Extension to install applications and Windows Features on Windows VMs.
-
-.DESCRIPTION
-This script configures each VMs per the role of the VMs in a fully automated way. The script will install the following applications and Windows Features on the VMs: 
-a. Common - PowerShell 7 and Az Modules 
-b. 1 x AD Domain Controller - Active Directory Domain Services, DNS Server
-c. 2 x Node Servers - Failover Clustering, File Server Services such as NFS, SMB, and iSCSI
-
-.PARAMETER NodeList
-An array that contains the VM names and IP addresses. It is passed as a parameter to the remote script.
-
-.PARAMETER VmName
-Specifies the name of the virtual machine.
-
-.PARAMETER VmRole
-Specifies the role of the virtual machine (`domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node).
-
-.PARAMETER AdminName
-Specifies the name of the administrator account for the domain.
-
-.PARAMETER Secret
-Specifies the password for the administrator account.
-
-.PARAMETER DomainName
-Specifies the name of the domain.
-
-.PARAMETER DomainNetBiosName
-Specifies the NetBIOS name of the domain.
-
-.PARAMETER DomainServerIpAddress
-Specifies the Private IP Address of the domain server.
-
-.EXAMPLE
-.\InstallRolesAndFeatures.ps1 -NodeList @(@("server-01", "192.168.1.1")) -VmRole domaincontroller -AdminName Admin -adminSecret P@ssw0rd -DomainName contoso.com -DomainNetBiosName CONTOSO -DomainServerIpAddress
-
-.NOTES
-- This script is tested on Windows Server 2022 VMs.
-- This script requires elevated privileges to run, i.e., as an administrator.
-- The `NodeList` parameter has default values for testing purposes.
-- The `VmRole` parameter must be one of the following: `domain`, `domaincontroller`, or `dc` for a domain controller; anything else for a node.
-- The `AdminName` and `-adminSecret` parameters must specify the name and password of an administrator account for the domain.
-#>
-
 param(
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ResourceGroupName,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $VmRole,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $VmName,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $AdminName,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Secret,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainName,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainNetBiosName,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DomainServerIpAddress,
-    [Parameter(Mandatory = $true)] [array]  [ValidateNotNullOrEmpty()] $NodeList,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaName,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $SaKey,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterName,
-    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ClusterIp
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Role,
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $VmParametersJson
 )
 
 ############################################################################################################
@@ -478,22 +400,47 @@ Function Set-RequiredFirewallRules {
 ############################################################################################################
 # Execution Body
 ############################################################################################################
+<#
+var config_variables  = {
+  admin_name: admin_name
+  admin_password: admin_password
+  domain_name: domain_name 
+  domain_netbios_name: domain_netbios_name
+  domain_server_ip: domain_server_ip
+  storage_account_name: storage_account_resource.name
+  storage_account_key: storage_account_resource.listKeys().keys[0].value
+  cluster_name: cluster_name 
+  cluster_ip: cluster_ip
+  cluster_role_ip: cluster_role_ip
+  cluster_network_name: cluster_network_name
+  cluster_probe_port: cluster_probe_port
+}
+#>
 
-Write-Output "ResourceGroupName: $ResourceGroupName"
-Write-Output "VmRole: $VmRole"
-Write-Output "VmName: $VmName"
-Write-Output "AdminName: $AdminName"
-Write-Output "DomainName: $DomainName"
-Write-Output "DomainNetBiosName: $DomainNetBiosName"
-Write-Output "DomainServerIpAddress: $DomainServerIpAddress"
-Write-Output "NodeList: $NodeList"
-Write-Output "SaName: $SaName"
-Write-Output "SaKey: $SaKey"
-Write-Output "ClusterName: $ClusterName"
-Write-Output "ClusterIp: $ClusterIp"
-Write-Output "ClusterNetworkName: $ClusterNetworkName"
-Write-Output "ClusterRoleIpAddress: $ClusterRoleIpAddress"
-Write-Output "ProbePort: $ProbePort"
+$vmParameters = ConvertFrom-Json $VmParametersJson
+
+Write-EventLog -Message "Starting Windows VM Custom Script Extension" -EntryType Information
+Write-EventLog -Message "Parameters: $vmParameters" -EntryType Information
+
+Write-Output "AdminName: $($vmParameters.admin_name)"
+Write-Output "DomainName: $($vmParameters.domain_name)"
+Write-Output "DomainNetBiosName: $($vmParameters.domain_netbios_name)"
+Write-Output "DomainServerIpAddress: $($vmParameters.domain_server_ip)"
+Write-Output "SaName: $($vmParameters.storage_account_name)"
+Write-Output "SaKey: $($vmParameters.storage_account_key)"
+Write-Output "ClusterName: $($vmParameters.cluster_name)"
+Write-Output "ClusterIp: $($vmParameters.cluster_ip)"
+Write-Output "ClusterRoleIpAddress: $($vmParameters.cluster_role_ip)"
+Write-Output "ClusterNetworkName: $($vmParameters.cluster_network_name)"
+Write-Output "ProbePort: $($vmParameters.cluster_probe_port)"
+
+$vmRole = $Role
+$AdminName = $vmParameters.admin_name
+$Secret = $vmParameters.admin_password
+$DomainName = $vmParameters.domain_name
+$DomainNetBiosName = $vmParameters.domain_netbios_name
+
+# $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -Role $Role -ArgumentList $Parameters`""
 
 ############################################################################################################
 # Variable Definitions
@@ -541,7 +488,7 @@ try {
         Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 5 -RetryIntervalSeconds 1
         Write-EventLog -Message "Starting scheduled task to join the cluster to the domain (timestamp: $((Get-Date).ToUniversalTime().ToString("o")))." -EntryType Information
         # action: join-mscs-domain.ps1
-        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -DomainName '$domainName' -DomainServerIpAddress '$domainServerIpAddress' -AdminName '$AdminName' -AdminPass '$Secret' -ClusterIpAddress $ClusterIpAddress -ClusterName '$ClusterName' -StorageAccount '$StorageAccountName' -StorageAccountKey '$StorageAccountKey' -ClusterNetworkName $ClusterNetworkName -ClusterRoleIpAddress $ClusterRoleIpAddress -ProbePort $ProbePort`""
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath' -VmParametersJson $VmParametersJson`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn
         $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew

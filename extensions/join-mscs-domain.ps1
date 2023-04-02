@@ -1,15 +1,5 @@
 param (
-    [Parameter(Mandatory = $true)] [string] $DomainName,
-    [Parameter(Mandatory = $true)] [string] $DomainServerIpAddress,
-    [Parameter(Mandatory = $true)] [string] $AdminName,
-    [Parameter(Mandatory = $true)] [string] $AdminPass,
-    [Parameter(Mandatory = $true)] [string] $ClusterIpAddress,              # Cluster's IP
-    [Parameter(Mandatory = $true)] [string] $ClusterName,                   # MSCS Cluster Instance Name
-    [Parameter(Mandatory = $true)] [string] $StorageAccountName,            # Cloud Witness Storage Account Name
-    [Parameter(Mandatory = $true)] [string] $StorageAccountKey,             # Cloud Witness Storage Account Key
-    [Parameter(Mandatory = $true)] [string] $ClusterNetworkName,            # Cluster Network 1
-    [Parameter(Mandatory = $true)] [string] $ClusterRoleIpAddress,          # File Server IP (ILB)
-    [Parameter(Mandatory = $true)] [string] $ProbePort                      # Probe Port (ILB)
+    [Parameter(Mandatory = $true)] [string] $VmParametersJson
 )
 
 # Function to download a file from a URL, retrying if necessary.
@@ -103,10 +93,26 @@ Function Write-EventLog {
     }
     catch {
         Write-Host "Failed to write log entry to file: $($_.Exception.Message)"
-        Write-Error "Failed to write log entry to file: $($_.Exception.Message)"
-        thorw $_.Exception
+        Write-Output "Failed to write log entry to file: $($_.Exception.Message)"
     }
 }
+
+# Parse the VM parameters JSON.
+$vmParameters = ConvertFrom-Json $VmParametersJson
+
+# Display the VM parameters.
+Write-EventLog -Message "Starting Windows VM Custom Script Extension" -EntryType Information
+Write-EventLog -Message "Parameters: $vmParameters" -EntryType Information
+
+# Extract the VM parameters for this script to run
+$AdminName = $vmParameters.admin_name
+$AdminPass = $vmParameters.admin_password
+$DomainName = $vmParameters.domain_name
+$DomainServerIpAddress = $vmParameters.domain_server_ip
+
+##############################################################################################################
+# Join the VM to the domain
+##############################################################################################################
 
 $MaxRetries = 30
 $RetryIntervalSeconds = 1
@@ -125,6 +131,7 @@ while ($retries -lt $MaxRetries) {
         $retries++
     }
     else {
+        # Carry out basic network connectivity tests with retries to ensure that the network is ready
         Set-DnsClientServerAddress -InterfaceIndex ((Get-NetAdapter -Name "Ethernet").ifIndex) -ServerAddresses $DomainServerIpAddress
         Clear-DnsClientCache
         
@@ -132,43 +139,29 @@ while ($retries -lt $MaxRetries) {
         Write-EventLog -Message "Network connectivity to $TargetDns is OK."
 
         Test-NetConnection -ComputerName $DomainName
-        Write-EventLog -Message "Network connectivity to domain controller $DomainServerIpAddress is OK." -EntryType Information
+        Write-EventLog -Message "Network connectivity to domain controller by FQDN ($DomainName) is OK." -EntryType Information
         
-        try {
-            $scriptUrl = "https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
-            $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
-            # Save parameters for post-configuration process after domain join and reboot
-            $parameterPath = "C:\\Temp\\parameters.json"
-            $parameters = @{
-                "DomainName" = $DomainName
-                "ClusterName" = $ClusterName
-                "ClusterIpAddress" = $ClusterIpAddress
-                "StorageAccountName" = $StorageAccountName
-                "StorageAccountKey" = $StorageAccountKey
-                "ClusterNetworkName" = $ClusterNetworkName
-                "ClusterRoleIpAddress" = $ClusterRoleIpAddress
-                "ProbePort" = $ProbePort
-            } | ConvertTo-Json | Out-File -FilePath $parameterPath -Encoding ASCII
-            Write-EventLog -Message "Saved parameters for post-configuration process after domain join and reboot $parameters" -EntryType Information
+        # download and store the post-config script for the scheduled task to run after joining the domain reboot
+        $scriptUrl = "https://raw.githubusercontent.com/apacdev/mscs-storage-cluster/main/extensions/set-mscs-failover-cluster.ps1"
+        $scriptPath = "C:\\Temp\\set-mscs-failover-cluster.ps1"
+        $parameterPath = "C:\\Temp\\parameters.json"
+        $VmParametersJson | Out-File -FilePath $parameterPath -Encoding ASCII
+        
+        Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 10 -RetryIntervalSeconds 1
+        Write-EventLog -Message "Downloaded script to run after reboot (task schedule) $scriptPath" -EntryType Information
 
-            # Download script to run after reboot
-            Get-WebResourcesWithRetries -SourceUrl $scriptUrl -DestinationPath $scriptPath -MaxRetries 10 -RetryIntervalSeconds 1
-            Write-EventLog -Message "Downloaded script to run after reboot (task schedule) $scriptPath" -EntryType Information
-
-            # Register a task to run once after reboot
-            $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath'`""
-            $trigger = New-ScheduledTaskTrigger -AtLogOn
-            $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(120).ToString("o")
-            $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
-            Register-ScheduledTask -TaskName "Configure FS Cluster" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
-            Write-EventLog -Message "Registered task to run after reboot (task schedule) $scriptPath" -EntryType Information
-
-        } catch {
-            Write-EventLog -Message "Failed to download script to join machines to domain $scriptPath" -EntryType Error
-        }
+        # Register a task to run once after reboot
+        $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -Command `"& '$scriptPath'`" -VmParametersJson '$parameterPath'"
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        $trigger.EndBoundary = (Get-Date).ToUniversalTime().AddMinutes(30).ToString("o")
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Compatibility Win8 -MultipleInstances IgnoreNew
+        
+        Register-ScheduledTask -TaskName "Configure FS Cluster" -Action $action -Trigger $trigger -Settings $settings -User $AdminName -RunLevel Highest -Force
+        Write-EventLog -Message "Registered task to run after reboot (task schedule) $scriptPath" -EntryType Information
         
         # Join domain
         Write-EventLog -Message "Joining domain $DomainName" -EntryType Information
+
         try {
             Add-Computer -ComputerName $env:COMPUTERNAME `
                 -LocalCredential $Credential `

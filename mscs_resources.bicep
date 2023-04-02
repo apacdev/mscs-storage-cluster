@@ -147,6 +147,18 @@ param eip_v6_03_name string  = 'eip_v6_03'
 @description('Sku for the LogAnalytics Workspace.')
 param log_space_sku string  = 'PerGB2018'
 
+@description('Name for the Failover Cluster.')
+param cluster_name string = 'mscs-cluster'
+
+@description('Name for the Cluster Instance IPv4 Address.')
+param cluster_ip string = ilb_ip_addr
+
+@description('Name for the Cluster Network.')
+param cluster_network_name string = 'Cluster Network 1'
+
+@description('Port for the Cluster Probe.')
+param cluster_probe_port string = '61800'
+
 @description('Allowed size of the Virtual Machines.')
 @allowed([
   'Standard_F4s_v2'
@@ -159,9 +171,6 @@ param vm_size string = 'Standard_F4s_v2'
 @minLength(3)
 @maxLength(24)
 param storage_account_name string = 'mscskrcommonstoragespace'
-
-param cluster_name string = 'mscs-cluster'
-param cluster_ip string = '172.16.0.50'
 
 // create resource group for network resources
 resource mscs_network_resources 'Microsoft.Resources/resourceGroups@2022-09-01' = {
@@ -266,22 +275,17 @@ module compute_resources 'mscs_compute_module.bicep' = {
   name: 'mscs_compute_module'
   params: {
     location: mscs_compute_resources.location
-    
     vm_01_name: vm_01_name
     vm_02_name: vm_02_name
     vm_03_name: vm_03_name
-
-    disk_name: disk_name
-
     mscs_network_resources_name: mscs_network_resources_name
     mscs_storage_resources_name: mscs_storage_resources_name
     mscs_common_resources_name: mscs_common_resources_name
+    disk_name: disk_name
     storage_account_name: storage_account_name
-
     nic_vm_01_name: nic_01_name
     nic_vm_02_name: nic_02_name
     nic_vm_03_name: nic_03_name
-
     vm_size: vm_size
     admin_name: admin_name
     admin_password: admin_password
@@ -302,21 +306,25 @@ module custom_script_extension 'mscs_extension_module.bicep' = {
     location: mscs_compute_resources.location
     admin_name: admin_name
     admin_password: admin_password
+
     vm_01_name: vm_01_name
     vm_02_name: vm_02_name
     vm_03_name: vm_03_name
     vm_01_role: vm_01_role
     vm_02_role: vm_02_role
     vm_03_role: vm_03_role
-    iipv4_02_address: iip_v4_02_addr
-    iipv4_03_address: iip_v4_03_addr
+
     domain_name: domain_name
     domain_netbios_name: domain_netbios_name
     domain_server_ip: domain_server_ip
-    resource_group_name: mscs_compute_resources_name
-    storage_account_name: storage_account_name
+
     cluster_name: cluster_name
     cluster_ip: cluster_ip
+    cluster_role_ip: ilb_ip_addr
+    cluster_network_name: cluster_network_name
+    cluster_probe_port: cluster_probe_port
+
+    storage_account_name: storage_account_name
     mscs_common_resources_name: mscs_common_resources_name
   }
   dependsOn: [
