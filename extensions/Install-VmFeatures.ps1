@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory = $true)] [System.Buffers.Text.Base64] [ValidateNotNullOrEmpty()] $Variables
+    [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Variables
 )
 
 ############################################################################################################

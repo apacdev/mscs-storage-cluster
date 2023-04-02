@@ -12,7 +12,7 @@
       "value": "mscs_common_resources"
     },
     "vm_01_name": {
-      "value": "mscswvm-dns-01"
+      "value": "mscswvm-01"
     },
     "vm_02_name": {
       "value": "mscswvm-node-02"
