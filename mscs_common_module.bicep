@@ -51,16 +51,6 @@ resource storage_account_resource 'Microsoft.Storage/storageAccounts@2022-09-01'
     networkAcls: {
         resourceAccessRules: []
         bypass: 'AzureServices, Logging'
-        virtualNetworkRules: [
-            {
-              id: vnet_resource.properties.subnets[0].id
-              action: 'Allow'
-            }
-            {
-              id: vnet_resource.properties.subnets[1].id
-              action: 'Allow'
-          }
-        ]
         ipRules: [
           {
             value: '103.241.0.0/16'
@@ -68,6 +58,7 @@ resource storage_account_resource 'Microsoft.Storage/storageAccounts@2022-09-01'
           }
           {
             value: '103.241.62.240'
+            action: 'Allow'
           }
         ]
         defaultAction: 'Deny'
