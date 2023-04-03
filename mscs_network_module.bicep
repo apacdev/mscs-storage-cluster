@@ -108,6 +108,12 @@ resource vnet_resource 'Microsoft.Network/virtualNetworks@2022-07-01' = {
             subnet_01_ipv4_addr
             subnet_01_ipv6_addr
           ]
+          delegations: []
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Storage'
+            }
+          ]
         }
         type: 'Microsoft.Network/virtualNetworks/subnets'
       }
@@ -121,6 +127,12 @@ resource vnet_resource 'Microsoft.Network/virtualNetworks@2022-07-01' = {
             subnet_02_ipv4_addr
             subnet_02_ipv6_addr
           ]
+          delegations: []
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Storage'
+            }
+          ]
         }
         type: 'Microsoft.Network/virtualNetworks/subnets'
       }
@@ -130,6 +142,17 @@ resource vnet_resource 'Microsoft.Network/virtualNetworks@2022-07-01' = {
     }
   }
 }
+output vnet_resource_id string = vnet_resource.id
+output subnet array = [{
+  subnet_01: {
+    name: subnet_01_name
+    id: subnet_01_resource.id
+  }
+  subnet_02: {
+    name: subnet_02_name
+    id: subnet_02_resource.id
+  }
+}]
 
 // create resource for Subnet 01 (x.x.1.x/24)
 resource subnet_01_resource 'Microsoft.Network/virtualNetworks/subnets@2022-07-01' = {
@@ -614,7 +637,7 @@ resource ilb_resource 'Microsoft.Network/loadBalancers@2022-09-01' = {
         name: 'probe'
         properties: {
           protocol: 'Tcp'
-          port: ilb_probe_port
+          port: int(ilb_probe_port)
           intervalInSeconds: 15
           numberOfProbes: 5
         }
