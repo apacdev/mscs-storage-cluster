@@ -43,6 +43,40 @@ Function Write-EventLog {
     }
 }
 
+# Function to query a drive and partition information 
+Function Get-ShareddiskNumber {
+    param(
+        [Parameter(Mandatory=$false)] [string] $SharedDiskName = 'Msft Virtual Disk'
+    )
+    $disks = Get-Disk | Where-Object { $_.FriendlyName -eq  $SharedDiskName } | Select-Object -Property DiskNumber
+
+    if ($null -ne $disks)
+    {
+        return $disks[0].DiskNumber
+    } else {
+        throw [System.SystemException] "No elibible Shared Disk was found."
+    }
+}
+
+Function Format-SharedDisk {
+    param(
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $DriveLetter,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $FileSystem,
+        [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $Label
+    )
+    try {
+        # Format the drive
+        $drive = Get-Volume | Where-Object { $_.DriveLetter -eq $DriveLetter }
+        $drive | Format-Volume -FileSystem $FileSystem -NewFileSystemLabel $Label -Confirm:$false
+        Write-EventLog -Message "Format-Drive: $drive | Format-Volume -FileSystem $FileSystem -NewFileSystemLabel $Label -Confirm:$false"
+    }
+    catch {
+        Write-EventLog -Message "Format-Drive: $($_.Exception.Message)"
+        Write-Error "Format-Drive: $($_.Exception.Message)"
+        throw $_.Exception
+    }
+}
+
 # Function to set the cluster shared volume (CSV)
 Function Set-MscsClusterSharedVolume {
     [CmdletBinding()]
@@ -104,7 +138,7 @@ Function Set-MscsClusterSharedVolume {
     }
 }
 
-# Function to read parameters.json file
+# Function to read parameters.json file in base64 format
 Function Read-ParametersJson {
     param(
         [Parameter(Mandatory = $true)] [string] [ValidateNotNullOrEmpty()] $ParameterPath
